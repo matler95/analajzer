@@ -1,5 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useReducer } from "react";
 import { apiFetch, setTokens, clearTokens, getTokens, API_BASE } from "./api.js";
+import { useAuthDomain, useAnalysisDomain, useHistoryDomain, useVerificationDomain } from "./hooks/useFlowDomains.js";
+import FlowChecklist from "./components/FlowChecklist.jsx";
+import StatusBanner from "./components/StatusBanner.jsx";
+import AnalyzeInput from "./components/AnalyzeInput.jsx";
+import AuthModal from "./components/AuthModal.jsx";
+import HistoryView from "./components/HistoryView.jsx";
+import ResultView from "./components/ResultView.jsx";
 
 const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -70,7 +77,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .id-lbl{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
 .id-val{font-family:var(--ff-m);font-size:13px;font-weight:600;letter-spacing:1px}
 .id-val.nil{color:var(--muted);font-weight:400;font-size:12px;letter-spacing:.5px}
-.id-input{width:100%;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--ff-m);font-size:14px;letter-spacing:1px;padding:8px 10px;outline:none}
+.id-input{width:100%;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--ff-m);font-size:12px;letter-spacing:1px;padding:8px 10px;outline:none}
 .id-input:focus{border-color:var(--amber);outline:2px solid var(--amber);outline-offset:1px}
 .id-input[type="date"]{color-scheme:dark}
 .desc-box{margin-top:1px;background:var(--card);border:1px solid var(--border2);padding:16px 18px}
@@ -106,7 +113,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .auth-row input{background:var(--card2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--ff-m);font-size:12px;min-width:140px}
 .auth-row .mini{font-family:var(--ff-m);font-size:10px;color:var(--sub)}
 .history-list{display:flex;flex-direction:column;gap:10px}
-.hist-row{position:relative;display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:stretch;border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);cursor:pointer;transition:border-color .15s}
+.hist-row{position:relative;display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:stretch;border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);transition:border-color .15s}
 .hist-row:hover{border-color:var(--amber)}
 .hist-thumb{width:120px;aspect-ratio:16/10;object-fit:cover;background:var(--card2)}
 .hist-main{padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -137,7 +144,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .hist-field .edit-actions{margin-top:8px}
 .hist-tap{margin-top:6px;width:100%;text-align:left;border:none;background:transparent;color:inherit;padding:0;cursor:text}
 .hist-tap:focus{outline:none}
+.edit-hint{display:inline-block;margin-right:6px;font-size:10px;color:var(--sub);opacity:.75;vertical-align:middle}
 .hist-row-note{font-family:var(--ff-m);font-size:10px;color:var(--sub)}
+.flow-checklist{margin:10px 0 16px;padding:10px 12px;border:1px solid var(--border2);background:var(--card);border-radius:4px;display:flex;flex-wrap:wrap;gap:8px}
+.flow-step{font-family:var(--ff-m);font-size:10px;letter-spacing:.4px;padding:4px 8px;border-radius:999px;border:1px solid var(--border2);color:var(--sub);background:var(--card2)}
+.flow-step.ok{color:var(--green);border-color:#3db87a66;background:#3db87a1a}
+.flow-step.current{color:var(--amber);border-color:#f0a50066;background:#f0a5001a}
+.status-banner{margin-top:10px;padding:10px 12px;border:1px solid var(--border2);border-left:3px solid var(--amber);background:var(--card);font-family:var(--ff-m);font-size:11px;color:var(--text)}
+.status-banner.error{border-color:#e0454566;border-left-color:var(--red);color:#ffb0b0;background:#e0454510}
 @media(max-width:680px){
   .hist-row{grid-template-columns:90px 1fr;grid-template-rows:auto auto}
   .hist-thumb{width:90px}
@@ -822,6 +836,35 @@ function checkTooltip(check) {
   return `Ogłoszenie: ${left} | CEPiK: ${right}`;
 }
 
+const FLOW_STAGE = {
+  IDLE: "idle",
+  URL_READY: "url_ready",
+  ANALYZING: "analyzing",
+  ANALYZED: "analyzed",
+  READY_TO_VERIFY: "ready_to_verify",
+  VERIFIED: "verified",
+  SAVED: "saved",
+};
+
+function flowReducer(state, action) {
+  switch (action.type) {
+    case "URL_TYPED":
+      return { ...state, stage: action.hasUrl ? FLOW_STAGE.URL_READY : FLOW_STAGE.IDLE };
+    case "ANALYSIS_START":
+      return { ...state, stage: FLOW_STAGE.ANALYZING };
+    case "ANALYSIS_DONE":
+      return { ...state, stage: FLOW_STAGE.ANALYZED };
+    case "READY_TO_VERIFY":
+      return { ...state, stage: FLOW_STAGE.READY_TO_VERIFY };
+    case "VERIFIED":
+      return { ...state, stage: FLOW_STAGE.VERIFIED };
+    case "SAVED":
+      return { ...state, stage: FLOW_STAGE.SAVED };
+    default:
+      return state;
+  }
+}
+
 /* ─── APP ────────────────────────────────────────────────── */
 export default function App() {
   const [url, setUrl] = useState("");
@@ -853,6 +896,8 @@ export default function App() {
   const [histEditErr, setHistEditErr] = useState({});
   const [histEditValidation, setHistEditValidation] = useState({});
   const [histVerifyBusy, setHistVerifyBusy] = useState({});
+  const [uxNotice, setUxNotice] = useState(null);
+  const [flowState, dispatchFlow] = useReducer(flowReducer, { stage: FLOW_STAGE.IDLE });
 
   useEffect(() => {
     const el = document.createElement("style");
@@ -892,10 +937,15 @@ export default function App() {
 
   const portal = detectPortal(url);
 
+  useEffect(() => {
+    dispatchFlow({ type: "URL_TYPED", hasUrl: Boolean(url.trim()) });
+  }, [url]);
+
   const run = useCallback(async () => {
     const u = url.trim();
     if (!u) return;
     setLoading(true);
+    dispatchFlow({ type: "ANALYSIS_START" });
     setError(null);
     setData(null);
     setShowDebug(false);
@@ -922,6 +972,7 @@ export default function App() {
               });
             }
             setSaveMsg("Wczytano z historii (bez ponownego fetch).");
+            dispatchFlow({ type: "ANALYSIS_DONE" });
             return;
           }
         }
@@ -930,6 +981,7 @@ export default function App() {
       const car = parseMd(md, u);
       car.listingUrl = normU;
       setData(car);
+      dispatchFlow({ type: "ANALYSIS_DONE" });
     } catch (e) {
       setError(e.message ?? "Nieznany błąd");
     } finally {
@@ -978,7 +1030,14 @@ export default function App() {
 
   const openHistoryItem = async id => {
     const res = await apiFetch(`/searches/${id}`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setUxNotice({
+        kind: "error",
+        msg: formatFastApiDetail(j.detail) || "Nie udało się otworzyć wpisu historii.",
+      });
+      return;
+    }
     const row = await res.json();
     setData(mergeSearchRecord(row));
     setSavedSearchId(row.id);
@@ -996,47 +1055,73 @@ export default function App() {
     setTab("analyze");
   };
 
+  const HIST_TO_ANALYZE_FIELD = {
+    manual_license_plate: "licensePlate",
+    manual_vin: "vin",
+    manual_first_registration: "firstRegistration",
+  };
+
+  const toAnalyzeFieldKey = key => HIST_TO_ANALYZE_FIELD[key] || key;
+
+  const normalizeEditableValue = (key, rawValue) => {
+    const raw = String(rawValue ?? "").trim();
+    if (!raw) return null;
+    if (key === "vin") return normalizeVin(raw) || null;
+    if (key === "licensePlate") return normalizeLicensePlate(raw) || null;
+    if (key === "firstRegistration") return normalizeDateForCepik(raw) || null;
+    return raw;
+  };
+
+  const getEditableFieldError = (key, val) => {
+    if (!val) return null;
+    if (key === "vin" && !isValidVin(val)) {
+      return "Niepoprawny VIN (wymagane 17 znaków, bez I/O/Q).";
+    }
+    if (key === "licensePlate" && !isValidLicensePlate(val)) {
+      return "Niepoprawny numer rejestracyjny (oczekiwane 5-8 znaków A-Z/0-9).";
+    }
+    if (key === "firstRegistration" && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      return "Niepoprawny format daty. Użyj kalendarza lub YYYY-MM-DD.";
+    }
+    return null;
+  };
+
   const getValidationStatus = (key, draft) => {
+    const fieldKey = toAnalyzeFieldKey(key);
     const raw = String(draft ?? "").trim();
-    if (!raw) return { status: 'empty', msg: '' };
-    
-    if (key === 'vin') {
-      const normalized = normalizeVin(raw);
-      const isValid = normalized ? isValidVin(normalized) : false;
+    if (!raw) return { status: "empty", msg: "" };
+
+    const normalized = normalizeEditableValue(fieldKey, raw);
+    const error = getEditableFieldError(fieldKey, normalized);
+
+    if (fieldKey === "vin") {
       const len = normalized ? normalized.length : 0;
       return {
-        status: isValid ? 'valid' : 'invalid',
-        msg: `${len} / 17 znaków ${isValid ? '✓ Poprawny format' : '✗ Niepoprawny (bez I/O/Q)'}`
+        status: error ? "invalid" : "valid",
+        msg: `${len} / 17 znaków ${error ? "✗ Niepoprawny (bez I/O/Q)" : "✓ Poprawny format"}`,
       };
     }
-    
-    if (key === 'licensePlate') {
-      const normalized = normalizeLicensePlate(raw);
-      const isValid = normalized ? isValidLicensePlate(normalized) : false;
+
+    if (fieldKey === "licensePlate") {
       return {
-        status: isValid ? 'valid' : 'invalid',
-        msg: normalized ? `"${normalized}" ${isValid ? '✓ Poprawny' : '✗ Niepoprawny (5-8 znaków A-Z/0-9)'}` : '✗ Wymagane pole'
+        status: error ? "invalid" : "valid",
+        msg: normalized ? `"${normalized}" ${error ? "✗ Niepoprawny (5-8 znaków A-Z/0-9)" : "✓ Poprawny"}` : "✗ Wymagane pole",
       };
     }
-    
-    if (key === 'firstRegistration') {
-      const normalized = normalizeDateForCepik(raw);
-      const isValid = normalized ? /^\d{4}-\d{2}-\d{2}$/.test(normalized) : false;
+
+    if (fieldKey === "firstRegistration") {
       return {
-        status: isValid ? 'valid' : 'invalid',
-        msg: normalized ? (isValid ? '✓ Data prawidłowa' : '✗ Format YYYY-MM-DD') : '✗ Wymagane pole'
+        status: error ? "invalid" : "valid",
+        msg: normalized ? (error ? "✗ Format YYYY-MM-DD" : "✓ Data prawidłowa") : "✗ Wymagane pole",
       };
     }
-    
-    return { status: 'empty', msg: '' };
+
+    return { status: "empty", msg: "" };
   };
 
   const startEdit = key => {
     if (!data) return;
-    let seed = String(data[key] ?? "");
-    if (key === "licensePlate") seed = normalizeLicensePlate(seed);
-    if (key === "vin") seed = normalizeVin(seed);
-    if (key === "firstRegistration") seed = normalizeDateForCepik(seed);
+    const seed = normalizeEditableValue(key, data[key]) ?? "";
     setEditDraft(d => ({ ...d, [key]: seed }));
     setEditErr(e => ({ ...e, [key]: null }));
     setEditMode(m => ({ ...m, [key]: true }));
@@ -1048,22 +1133,10 @@ export default function App() {
   };
 
   const confirmEdit = key => {
-    const raw = String(editDraft[key] ?? "").trim();
-    let val = raw || null;
-    if (key === "vin") val = normalizeVin(raw) || null;
-    if (key === "licensePlate") val = normalizeLicensePlate(raw) || null;
-    if (key === "firstRegistration") val = normalizeDateForCepik(raw) || null;
-
-    if (key === "vin" && val && !isValidVin(val)) {
-      setEditErr(e => ({ ...e, vin: "Niepoprawny VIN (wymagane 17 znaków, bez I/O/Q)." }));
-      return;
-    }
-    if (key === "licensePlate" && val && !isValidLicensePlate(val)) {
-      setEditErr(e => ({ ...e, licensePlate: "Niepoprawny numer rejestracyjny (oczekiwane 5–8 znaków A-Z/0-9)." }));
-      return;
-    }
-    if (key === "firstRegistration" && val && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      setEditErr(e => ({ ...e, firstRegistration: "Niepoprawny format daty. Użyj kalendarza lub YYYY-MM-DD." }));
+    const val = normalizeEditableValue(key, editDraft[key]);
+    const error = getEditableFieldError(key, val);
+    if (error) {
+      setEditErr(e => ({ ...e, [key]: error }));
       return;
     }
 
@@ -1076,7 +1149,14 @@ export default function App() {
     const ok = window.confirm("Usunąć to ogłoszenie z historii?");
     if (!ok) return;
     const res = await apiFetch(`/searches/${id}`, { method: "DELETE" });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setUxNotice({
+        kind: "error",
+        msg: formatFastApiDetail(j.detail) || "Nie udało się usunąć wpisu z historii.",
+      });
+      return;
+    }
     setHistory(prev => prev.filter(h => h.id !== id));
     if (savedSearchId === id) {
       setSavedSearchId(null);
@@ -1089,10 +1169,8 @@ export default function App() {
   const histStartEdit = (id, key, currentValue) => {
     setHistEditDraft(d => {
       const row = d[id] || {};
-      let seed = String(currentValue ?? "");
-      if (key === "manual_license_plate") seed = normalizeLicensePlate(seed);
-      if (key === "manual_vin") seed = normalizeVin(seed);
-      if (key === "manual_first_registration") seed = normalizeDateForCepik(seed);
+      const analyzeKey = toAnalyzeFieldKey(key);
+      const seed = normalizeEditableValue(analyzeKey, currentValue) ?? "";
       return { ...d, [id]: { ...row, [key]: seed } };
     });
     setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: null } }));
@@ -1106,22 +1184,11 @@ export default function App() {
 
   const histConfirmEdit = async (id, key) => {
     const draft = histEditDraft[id] || {};
-    const raw = String(draft[key] ?? "").trim();
-    let val = raw || null;
-    if (key === "manual_vin") val = normalizeVin(raw) || null;
-    if (key === "manual_license_plate") val = normalizeLicensePlate(raw) || null;
-    if (key === "manual_first_registration") val = normalizeDateForCepik(raw) || null;
-
-    if (key === "manual_vin" && val && !isValidVin(val)) {
-      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: "Niepoprawny VIN (17 znaków, bez I/O/Q)." } }));
-      return;
-    }
-    if (key === "manual_license_plate" && val && !isValidLicensePlate(val)) {
-      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: "Niepoprawny numer rejestracyjny (5–8 znaków A-Z/0-9)." } }));
-      return;
-    }
-    if (key === "manual_first_registration" && val && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: "Niepoprawny format daty. Użyj kalendarza." } }));
+    const analyzeKey = toAnalyzeFieldKey(key);
+    const val = normalizeEditableValue(analyzeKey, draft[key]);
+    const error = getEditableFieldError(analyzeKey, val);
+    if (error) {
+      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: error } }));
       return;
     }
 
@@ -1129,7 +1196,14 @@ export default function App() {
       method: "PATCH",
       body: { [key]: val },
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setHistEditErr(e => ({
+        ...e,
+        [id]: { ...(e[id] || {}), [key]: formatFastApiDetail(j.detail) || "Nie udało się zapisać zmiany." },
+      }));
+      return;
+    }
     await loadHistory();
     setHistEditMode(m => ({ ...m, [id]: { ...(m[id] || {}), [key]: false } }));
   };
@@ -1155,7 +1229,14 @@ export default function App() {
           force_refresh: false,
         },
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setUxNotice({
+          kind: "error",
+          msg: formatFastApiDetail(j.detail) || "Weryfikacja pozycji z historii nie powiodła się.",
+        });
+        return;
+      }
       await loadHistory();
     } finally {
       setHistVerifyBusy(b => ({ ...b, [row.id]: false }));
@@ -1259,7 +1340,30 @@ export default function App() {
     (data.licensePlate || "").trim() &&
     (data.vin || "").trim() &&
     normalizeDateForCepik(data.firstRegistration || "");
+  const authDomain = useAuthDomain(me);
+  const analysisDomain = useAnalysisDomain({ url, loading, data });
+  useHistoryDomain({ history, histLoading });
+  const verificationDomain = useVerificationDomain({ me, data, cepik, cepikLoading, normalizeDateForCepik });
   const comparisonLookup = buildComparisonLookup(cepik);
+  useEffect(() => {
+    if (canVerify) dispatchFlow({ type: "READY_TO_VERIFY" });
+  }, [canVerify]);
+
+  useEffect(() => {
+    if (cepik) dispatchFlow({ type: "VERIFIED" });
+  }, [cepik]);
+
+  useEffect(() => {
+    if (savedSearchId) dispatchFlow({ type: "SAVED" });
+  }, [savedSearchId]);
+  const missingVerifyInputs = [];
+  if (!authDomain.isLoggedIn) missingVerifyInputs.push("logowanie");
+  if (!(data?.licensePlate || "").trim()) missingVerifyInputs.push("numer rejestracyjny");
+  if (!(data?.vin || "").trim()) missingVerifyInputs.push("VIN");
+  if (!normalizeDateForCepik(data?.firstRegistration || "")) missingVerifyInputs.push("data pierwszej rejestracji");
+  const verifyBlockedMsg = missingVerifyInputs.length
+    ? `Aby zweryfikować, uzupełnij: ${missingVerifyInputs.join(", ")}.`
+    : null;
 
   const dlJSON = () => {
     if (!data) return;
@@ -1306,9 +1410,21 @@ export default function App() {
             Historia
           </button>
         </div>
+        {tab === "analyze" && (
+          <FlowChecklist
+            analysisDomain={analysisDomain}
+            flowState={flowState}
+            data={data}
+            normalizeDateForCepik={normalizeDateForCepik}
+            verificationDomain={verificationDomain}
+            savedSearchId={savedSearchId}
+            FLOW_STAGE={FLOW_STAGE}
+          />
+        )}
+        <StatusBanner notice={uxNotice} />
 
         {tab === "history" && (
-          <div style={{ marginBottom: 24 }}>
+          <HistoryView>
             <div className="section-label">Zapisane wyszukiwania</div>
             {histLoading && <div className="load-msg">Ładowanie…</div>}
             {!me && <div className="note">Zaloguj się, aby zobaczyć historię.</div>}
@@ -1333,7 +1449,7 @@ export default function App() {
                   const rowDraft = histEditDraft[h.id] || {};
                   const rowErr = histEditErr[h.id] || {};
                   return (
-                    <div key={h.id} className="hist-row" onClick={() => openHistoryItem(h.id)}>
+                    <div key={h.id} className="hist-row">
                       {img ? <img className="hist-thumb" src={img} alt="" /> : <div className="hist-thumb" />}
                       <div className="hist-main">
                         <div className="hist-title">{title}</div>
@@ -1390,6 +1506,7 @@ export default function App() {
                                 onClick={() => histStartEdit(h.id, "manual_license_plate", effPlate)}
                                 title="Kliknij aby edytować"
                               >
+                                <span className="edit-hint" aria-hidden="true">✎  </span>
                                 {effPlate ? normalizeLicensePlate(effPlate) : "brak"}
                               </button>
                             )}
@@ -1430,6 +1547,7 @@ export default function App() {
                                 onClick={() => histStartEdit(h.id, "manual_vin", effVin)}
                                 title="Kliknij aby edytować"
                               >
+                                <span className="edit-hint" aria-hidden="true">✎  </span>
                                 {effVin ? normalizeVin(effVin) : "brak"}
                               </button>
                             )}
@@ -1470,6 +1588,7 @@ export default function App() {
                                 onClick={() => histStartEdit(h.id, "manual_first_registration", effFirstReg)}
                                 title="Kliknij aby edytować"
                               >
+                                <span className="edit-hint" aria-hidden="true">✎  </span>
                                 {effFirstReg ? normalizeDateForCepik(effFirstReg) : "brak"}
                               </button>
                             )}
@@ -1481,45 +1600,22 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="hist-actions" onClick={e => e.stopPropagation()}>
-                        <button type="button" className="act-mini primary" disabled={!canRowVerify || histVerifyBusy[h.id]} onClick={() => verifyHistoryItem(h)}>
-                          {histVerifyBusy[h.id] ? "…" : "Zweryfikuj"}
+                      <div className="hist-actions">
+                        <button type="button" title="Zweryfikuj" className="act-mini primary" disabled={!canRowVerify || histVerifyBusy[h.id]} onClick={() => verifyHistoryItem(h)}>
+                          {histVerifyBusy[h.id] ? "…" : "🔎"}
                         </button>
-                        <button type="button" className="act-mini" onClick={() => openHistoryItem(h.id)}>Otwórz</button>
-                        <button type="button" className="act-mini danger" onClick={() => deleteHistoryItem(h.id)}>Usuń</button>
+                        <button type="button" title="Otwórz" className="act-mini" onClick={() => openHistoryItem(h.id)}>➔</button>
+                        <button type="button" title="Usuń" className="act-mini danger" onClick={() => deleteHistoryItem(h.id)}>🗑</button>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </HistoryView>
         )}
 
-        {tab === "analyze" && (
-        <div className="input-area">
-          <div className="section-label">URL ogłoszenia</div>
-          <div className="input-wrap">
-            <input
-              className="url-in"
-              placeholder="https://www.otomoto.pl/osobowe/oferta/..."
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !loading && run()}
-            />
-            {portal !== "unknown" && (
-              <div className={`portal-chip ${portal}`}>{portal.toUpperCase()}.PL</div>
-            )}
-            <button className="go-btn" onClick={run} disabled={loading || !url.trim()}>
-              {loading ? "···" : "ANALIZUJ"}
-            </button>
-          </div>
-          <div className="hint">
-            Obsługiwane: otomoto.pl <span className="hint-dot">·</span> olx.pl
-            <span className="hint-dot">·</span> Działa przez r.jina.ai — bez klucza API
-          </div>
-        </div>
-        )}
+        {tab === "analyze" && <AnalyzeInput portal={portal} url={url} setUrl={setUrl} loading={loading} run={run} />}
 
         {tab === "analyze" && loading && (
           <div className="loader">
@@ -1536,7 +1632,7 @@ export default function App() {
         )}
 
         {tab === "analyze" && data && (
-          <div className="result">
+          <ResultView>
                 {data.portal && <div className="ch-src">ŹRÓDŁO: {data.portal}</div>}
 
             <div className="car-hero">
@@ -1601,16 +1697,6 @@ export default function App() {
                   <div className="spec" key={f.key} title={checkTooltip(check)}>
                     <div className="spec-lbl-row">
                       <div className="spec-lbl">{f.lbl}</div>
-                      {isEditableFirstReg && !editMode.firstRegistration && (
-                        <button
-                          type="button"
-                          className="edit-btn"
-                          title="Edytuj datę"
-                          onClick={() => startEdit("firstRegistration")}
-                        >
-                          ✎
-                        </button>
-                      )}
                       {check && (
                         <span 
                           className={`cmp-badge ${check.status}`}
@@ -1650,9 +1736,21 @@ export default function App() {
                         {editErr.firstRegistration && <div className="edit-err" id="err-firstRegistration">{editErr.firstRegistration}</div>}
                       </>
                     ) : (
-                      <div className={`spec-val${nil ? " nil" : ""}`}>
-                        {nil ? "—" : <>{val}{unit && <span className="u">{unit}</span>}</>}
-                      </div>
+                      isEditableFirstReg ? (
+                        <button
+                          type="button"
+                          className={`hist-tap spec-val${nil ? " nil" : ""}`}
+                          onClick={() => startEdit("firstRegistration")}
+                          title="Kliknij aby edytować"
+                        >
+                          <span className="edit-hint" aria-hidden="true">✎  </span>
+                          {nil ? "—" : <>{val}{unit && <span className="u">{unit}</span>}</>}
+                        </button>
+                      ) : (
+                        <div className={`spec-val${nil ? " nil" : ""}`}>
+                          {nil ? "—" : <>{val}{unit && <span className="u">{unit}</span>}</>}
+                        </div>
+                      )
                     )}
                   </div>
                 );
@@ -1663,10 +1761,7 @@ export default function App() {
               <div className="id-card">
                 <div className="id-ico">🪪</div>
                 <div style={{ width: "100%" }}>
-                  <div className="edit-row">
-                    <div className="id-lbl">Numer rejestracyjny (ręcznie / z ogłoszenia)</div>
-                    {!editMode.licensePlate && <button type="button" className="edit-btn" onClick={() => startEdit("licensePlate")}>✎</button>}
-                  </div>
+                  <div className="id-lbl">Numer rejestracyjny (ręcznie / z ogłoszenia)</div>
                   {editMode.licensePlate ? (
                     <>
                       <input
@@ -1704,7 +1799,15 @@ export default function App() {
                       {editErr.licensePlate && <div className="edit-err" id="err-licensePlate">{editErr.licensePlate}</div>}
                     </>
                   ) : (
-                    <div className={`id-val${!data.licensePlate ? " nil" : ""}`}>{data.licensePlate ?? "Niedostępne"}</div>
+                    <button
+                      type="button"
+                      className={`hist-tap id-val${!data.licensePlate ? " nil" : ""}`}
+                      onClick={() => startEdit("licensePlate")}
+                      title="Kliknij aby edytować"
+                    >
+                      <span className="edit-hint" aria-hidden="true">✎  </span>
+                      {data.licensePlate ?? "Niedostępne"}
+                    </button>
                   )}
                 </div>
               </div>
@@ -1723,10 +1826,7 @@ export default function App() {
               <div className="id-card">
                 <div className="id-ico">🔑</div>
                 <div style={{ width: "100%" }}>
-                  <div className="edit-row">
-                    <div className="id-lbl">Numer VIN (ręcznie)</div>
-                    {!editMode.vin && <button type="button" className="edit-btn" onClick={() => startEdit("vin")}>✎</button>}
-                  </div>
+                  <div className="id-lbl">Numer VIN (ręcznie)</div>
                   {editMode.vin ? (
                     <>
                       <input
@@ -1754,7 +1854,15 @@ export default function App() {
                       {editErr.vin && <div className="edit-err" id="err-vin">{editErr.vin}</div>}
                     </>
                   ) : (
-                    <div className={`id-val${!data.vin ? " nil" : ""}`}>{data.vin ?? "Niedostępne"}</div>
+                    <button
+                      type="button"
+                      className={`hist-tap id-val${!data.vin ? " nil" : ""}`}
+                      onClick={() => startEdit("vin")}
+                      title="Kliknij aby edytować"
+                    >
+                      <span className="edit-hint" aria-hidden="true">✎  </span>
+                      {data.vin ?? "Niedostępne"}
+                    </button>
                   )}
                 </div>
               </div>
@@ -1778,7 +1886,7 @@ export default function App() {
             )}
 
             <div className="actions">
-              <button className="act-btn primary" onClick={() => window.print()}>🖨 DRUKUJ / PDF</button>
+              <button className="act-btn" onClick={() => window.print()}>🖨 DRUKUJ / PDF</button>
               <button className="act-btn" onClick={dlJSON}>⬇ EKSPORTUJ JSON</button>
               <button className="act-btn" onClick={() => window.open(data.listingUrl, "_blank")}>↗ OGŁOSZENIE</button>
               <button className="act-btn" disabled={!me || !data || saveBusy} onClick={saveSearch} title={!me ? "Wymagane logowanie" : ""}>
@@ -1793,6 +1901,11 @@ export default function App() {
                 {cepikLoading ? "…" : "✓ Weryfikuj dane z gov"}
               </button>
             </div>
+            {!canVerify && verifyBlockedMsg && (
+              <div className="status-banner">
+                {verifyBlockedMsg} {!me && <button type="button" className="edit-btn" style={{ marginLeft: 8 }} onClick={() => setShowAuthModal(true)}>Zaloguj się</button>}
+              </div>
+            )}
             {saveMsg && <div className="note" style={{ marginTop: 8 }}>{saveMsg}{savedSearchId && <span className="meta-pill">ID {savedSearchId}</span>}</div>}
             {cepikErr && (
               <div className="err" style={{ marginTop: 12 }}>
@@ -1890,7 +2003,7 @@ export default function App() {
                 )}
               </div>
             )}
-          </div>
+          </ResultView>
         )}
 
         {pasteMsg && (
@@ -1899,49 +2012,17 @@ export default function App() {
           </div>
         )}
 
-        {showAuthModal && (
-          <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <button 
-                className="modal-close" 
-                onClick={() => setShowAuthModal(false)}
-                type="button"
-              >
-                ✕
-              </button>
-              <div className="modal-header">Logowanie</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input 
-                  type="email"
-                  placeholder="Email"
-                  value={authEmail}
-                  onChange={e => setAuthEmail(e.target.value)}
-                  className="id-input"
-                  autoComplete="username"
-                  onKeyDown={e => e.key === 'Enter' && login()}
-                />
-                <input 
-                  type="password"
-                  placeholder="Hasło"
-                  value={authPass}
-                  onChange={e => setAuthPass(e.target.value)}
-                  className="id-input"
-                  autoComplete="current-password"
-                  onKeyDown={e => e.key === 'Enter' && login()}
-                />
-                {authErr && <div className="err"><span className="err-ico">⚠</span>{authErr}</div>}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="button" className="act-btn primary" onClick={login} style={{ flex: 1 }}>
-                    Loguj
-                  </button>
-                  <button type="button" className="act-btn" onClick={register} style={{ flex: 1 }}>
-                    Rejestracja
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <AuthModal
+          showAuthModal={showAuthModal}
+          setShowAuthModal={setShowAuthModal}
+          authEmail={authEmail}
+          setAuthEmail={setAuthEmail}
+          authPass={authPass}
+          setAuthPass={setAuthPass}
+          authErr={authErr}
+          login={login}
+          register={register}
+        />
       </div>
     </div>
   );
