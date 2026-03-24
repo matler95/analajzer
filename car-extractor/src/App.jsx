@@ -408,7 +408,7 @@ function extractImages(md) {
   while ((m = re1.exec(md)) !== null) imgs.add(m[1]);
   const re2 = /\((https?:\/\/[^\s)]+\.(?:jpg|jpeg|png|webp)[^\s)]*)\)/gi;
   while ((m = re2.exec(md)) !== null) imgs.add(m[1]);
-  return [...imgs].slice(0, 12);
+  return [...imgs].filter(url => !/otomoto.*logo/i.test(url)).slice(0, 6);
 }
 
 function extractDescription(md) {
@@ -1192,7 +1192,14 @@ export default function App() {
           <div className="hdr-sub">OTOMOTO · OLX · via Jina AI Reader</div>
         </div>
         <div className="hdr-pill">
-          {me ? `✓ ${me.email}` : "API: " + API_BASE.replace(/^https?:\/\//, "")}
+          {me ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>Zalogowano jako <strong style={{ color: 'var(--text)' }}>{me.email}</strong></span>
+              <button type="button" style={{ fontSize: '8px', padding: '2px 6px', background: 'var(--red)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={logout}>Wyloguj</button>
+            </div>
+          ) : (
+            "API: " + API_BASE.replace(/^https?:\/\//, "")
+          )}
         </div>
       </header>
 
@@ -1206,23 +1213,16 @@ export default function App() {
           </button>
         </div>
 
-        <div className="auth-row">
-          {me ? (
-            <>
-              <span className="mini">Zalogowano jako <strong style={{ color: "var(--text)" }}>{me.email}</strong></span>
-              <button type="button" className="act-btn" onClick={logout}>Wyloguj</button>
-            </>
-          ) : (
-            <>
-              <input placeholder="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} autoComplete="username" />
-              <input type="password" placeholder="hasło" value={authPass} onChange={e => setAuthPass(e.target.value)} autoComplete="current-password" />
-              <button type="button" className="act-btn primary" onClick={login}>Loguj</button>
-              <button type="button" className="act-btn" onClick={register}>Rejestracja</button>
-              <span className="mini">Konto wymagane do historii i CEPiK</span>
-            </>
-          )}
-          {authErr && <span className="mini" style={{ color: "var(--red)", width: "100%" }}>{authErr}</span>}
-        </div>
+        {!me && (
+          <div className="auth-row">
+            <input placeholder="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} autoComplete="username" />
+            <input type="password" placeholder="hasło" value={authPass} onChange={e => setAuthPass(e.target.value)} autoComplete="current-password" />
+            <button type="button" className="act-btn primary" onClick={login}>Loguj</button>
+            <button type="button" className="act-btn" onClick={register}>Rejestracja</button>
+            <span className="mini">Konto wymagane do historii i CEPiK</span>
+            {authErr && <span className="mini" style={{ color: "var(--red)", width: "100%" }}>{authErr}</span>}
+          </div>
+        )}
 
         {tab === "history" && (
           <div style={{ marginBottom: 24 }}>
