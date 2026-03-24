@@ -22,14 +22,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .main{max-width:860px;margin:0 auto;padding:44px 24px 80px}
 .section-label{font-family:var(--ff-m);font-size:10px;color:var(--amber);letter-spacing:2.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .section-label::before{content:'';display:block;width:10px;height:2px;background:var(--amber)}
-.input-wrap{display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);transition:border-color .2s,box-shadow .2s}
-.input-wrap:focus-within{border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-glow)}
+.input-wrap{display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);transition:border-color .2s,outline .2s}
+.input-wrap:focus-within{border-color:var(--amber);outline:2px solid var(--amber);outline-offset:0}
 .url-in{flex:1;background:transparent;border:none;outline:none;padding:15px 18px;font-family:var(--ff-m);font-size:13px;color:var(--text);min-width:0}
 .url-in::placeholder{color:var(--muted)}
 .portal-chip{display:flex;align-items:center;padding:0 14px;font-family:var(--ff-m);font-size:10px;letter-spacing:1px;border-left:1px solid var(--border2)}
 .portal-chip.otomoto{color:#ff6b35}.portal-chip.olx{color:var(--green)}
 .go-btn{padding:0 28px;background:var(--amber);border:none;cursor:pointer;font-family:var(--ff-d);font-size:17px;letter-spacing:2px;color:#000;transition:background .15s,transform .1s;flex-shrink:0}
-.go-btn:hover{background:#ffc22a}.go-btn:active{transform:scale(.97)}.go-btn:disabled{background:var(--muted);color:var(--sub);cursor:not-allowed}
+.go-btn:hover{background:#ffc22a}.go-btn:active{transform:scale(.97)}.go-btn:disabled{background:var(--muted);color:var(--sub);cursor:not-allowed}.go-btn:focus{outline:2px solid var(--amber);outline-offset:2px}
 .hint{margin-top:9px;font-family:var(--ff-m);font-size:10px;color:var(--sub);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hint-dot{color:var(--muted)}
 .loader{margin-top:32px;border:1px solid var(--border2);border-radius:4px;background:var(--card);padding:44px;text-align:center;animation:fadeUp .3s ease}
@@ -51,7 +51,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .specs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-top:1px}
 .spec{background:var(--card);padding:16px 18px;transition:background .15s;cursor:default}
 .spec:hover{background:var(--card2)}
-.spec-lbl{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
+.spec-lbl{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;display:flex;align-items:center;gap:6px}
 .spec-lbl-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
 .spec-val{font-family:var(--ff-m);font-size:14px;font-weight:600;color:var(--text)}
 .spec-val .u{font-size:10px;color:var(--sub);font-weight:400;margin-left:3px}
@@ -69,7 +69,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .id-val{font-family:var(--ff-m);font-size:13px;font-weight:600;letter-spacing:1px}
 .id-val.nil{color:var(--muted);font-weight:400;font-size:12px;letter-spacing:.5px}
 .id-input{width:100%;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--ff-m);font-size:14px;letter-spacing:1px;padding:8px 10px;outline:none}
-.id-input:focus{border-color:var(--amber);box-shadow:0 0 0 2px var(--amber-glow)}
+.id-input:focus{border-color:var(--amber);outline:2px solid var(--amber);outline-offset:1px}
 .id-input[type="date"]{color-scheme:dark}
 .desc-box{margin-top:1px;background:var(--card);border:1px solid var(--border2);padding:16px 18px}
 .desc-lbl{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
@@ -80,7 +80,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .gallery-item:hover img{transform:scale(1.03)}
 .actions{display:flex;gap:1px;background:var(--border);margin-top:1px}
 .act-btn{flex:1;background:var(--card);border:none;cursor:pointer;padding:13px 16px;font-family:var(--ff-d);font-size:15px;letter-spacing:1.5px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s}
-.act-btn:hover{background:var(--card2);color:var(--text)}
+.act-btn:hover{background:var(--card2);color:var(--text)}.act-btn:focus{outline:2px solid var(--amber);outline-offset:-2px}
 .act-btn.primary{background:var(--amber-bg);color:var(--amber)}
 .act-btn.primary:hover{background:var(--amber);color:#000}
 .src-bar{background:var(--card);border-top:1px solid var(--border);padding:10px 18px;font-family:var(--ff-m);font-size:10px;color:var(--sub);display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -98,6 +98,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 }
 .tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border2);padding-bottom:8px}
 .tab{background:transparent;border:none;font-family:var(--ff-d);font-size:14px;letter-spacing:2px;color:var(--sub);padding:8px 16px;cursor:pointer;border-radius:4px 4px 0 0}
+.tab:focus{outline:2px solid var(--amber);outline-offset:-2px}
 .tab:hover{color:var(--text)}.tab.on{color:var(--amber);background:var(--amber-bg)}
 .auth-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;padding:12px 14px;border:1px solid var(--border2);border-radius:4px;background:var(--card)}
 .auth-row input{background:var(--card2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--ff-m);font-size:12px;min-width:140px}
@@ -146,13 +147,30 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .edit-btn{border:1px solid var(--border2);background:var(--card2);color:var(--sub);border-radius:6px;padding:4px 8px;cursor:pointer;font-family:var(--ff-m);font-size:11px}
 .edit-btn:hover{color:var(--text);border-color:var(--amber)}
 .edit-err{margin-top:8px;font-family:var(--ff-m);font-size:10px;color:var(--red);line-height:1.4}
+.verification-badge{display:inline-block;padding:6px 12px;border-radius:4px;font-family:var(--ff-m);font-size:10px;letter-spacing:1px;text-transform:uppercase;margin-top:8px;font-weight:600}
+.verification-badge.green{background:#3db87a1a;color:var(--green);border:1px solid #3db87a66}
+.verification-badge.yellow{background:#ffc22a1a;color:#ffd18c;border:1px solid #ffc22a66}
+.verification-badge.red{background:#e0454510;color:var(--red);border:1px solid #e0454566}
+.cepik-comparison-table{margin-top:12px;border:1px solid var(--border2);border-radius:4px;overflow:hidden}
+.cepik-row{display:grid;grid-template-columns:120px 1fr 1fr auto;gap:1px;background:var(--border);overflow:hidden}
+.cepik-cell{background:var(--card);padding:10px 12px;font-family:var(--ff-m);font-size:11px;display:flex;align-items:center}
+.cepik-cell.header{background:var(--card2);font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:1px}
+.cepik-cell.mismatch{background:#e0454510}
+.cepik-cell.value{color:var(--text)}
+.cepik-cell.status{justify-content:center;min-width:40px}
 .cepik-panel{margin-top:16px;border:1px solid var(--border2);border-radius:4px;background:var(--card);padding:16px 18px}
 .cepik-title{font-family:var(--ff-m);font-size:10px;color:var(--amber);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.cepik-disclaimer{margin-bottom:12px;padding:10px 12px;border-left:3px solid var(--amber);background:var(--amber-bg);border-radius:2px;font-family:var(--ff-m);font-size:10px;color:var(--text);line-height:1.5}
 .check-row{display:flex;align-items:flex-start;gap:10px;font-family:var(--ff-m);font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)}
 .check-row:last-child{border-bottom:none}
-.check-ico{flex-shrink:0;width:20px;text-align:center}
+.check-ico{flex-shrink:0;width:20px;text-align:center;font-weight:600}
 .check-field{flex:1;color:var(--sub);font-size:10px;text-transform:uppercase;letter-spacing:1px}
 .check-msg{flex:2;color:var(--text);line-height:1.4}
+.edit-pencil{display:inline-block;margin-left:6px;width:16px;height:16px;cursor:pointer;color:var(--sub);font-size:12px;transition:color .15s;opacity:0;transition:opacity .15s}
+.spec:hover .edit-pencil{opacity:1}
+.spec-lbl-row:hover .edit-pencil{opacity:1}
+.edit-pencil:hover{color:var(--amber)}
+.validation-msg{font-family:var(--ff-m);font-size:9px;margin-top:4px;display:flex;align-items:center;gap:6px}\n.validation-msg.valid{color:var(--green)}\n.validation-msg.invalid{color:var(--red)}\n.validation-msg.info{color:var(--sub)}\n.paste-toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--border2);border-radius:4px;padding:12px 16px;font-family:var(--ff-m);font-size:10px;color:var(--text);max-width:280px;box-shadow:0 4px 12px rgba(0,0,0,0.3);animation:slideIn .3s ease;z-index:999}\n@keyframes slideIn{from{transform:translateX(300px);opacity:0}to{transform:translateX(0);opacity:1}}\n.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .2s ease}\n@keyframes fadeIn{from{opacity:0}to{opacity:1}}\n.modal-content{background:var(--card);border:1px solid var(--border2);border-radius:4px;padding:24px;max-width:400px;animation:slideUp .3s ease}\n@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}\n.modal-header{font-family:var(--ff-d);font-size:18px;letter-spacing:2px;margin-bottom:16px;color:var(--text)}\n.modal-close{position:absolute;top:12px;right:12px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--sub);transition:color .15s}\n.modal-close:hover{color:var(--text)}
 .meta-pill{display:inline-block;font-size:9px;padding:2px 8px;border-radius:10px;background:var(--card2);color:var(--sub);margin-left:8px}
 @media print{
   .hdr,.input-area,.actions,.note,.tabs,.auth-row,.cepik-panel{display:none!important}
@@ -825,9 +843,13 @@ export default function App() {
   const [editMode, setEditMode] = useState({ licensePlate: false, firstRegistration: false, vin: false });
   const [editDraft, setEditDraft] = useState({ licensePlate: "", firstRegistration: "", vin: "" });
   const [editErr, setEditErr] = useState({ licensePlate: null, firstRegistration: null, vin: null });
+  const [editValidation, setEditValidation] = useState({ licensePlate: null, firstRegistration: null, vin: null });
+  const [pasteMsg, setPasteMsg] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [histEditMode, setHistEditMode] = useState({});
   const [histEditDraft, setHistEditDraft] = useState({});
   const [histEditErr, setHistEditErr] = useState({});
+  const [histEditValidation, setHistEditValidation] = useState({});
   const [histVerifyBusy, setHistVerifyBusy] = useState({});
 
   useEffect(() => {
@@ -970,6 +992,41 @@ export default function App() {
       });
     }
     setTab("analyze");
+  };
+
+  const getValidationStatus = (key, draft) => {
+    const raw = String(draft ?? "").trim();
+    if (!raw) return { status: 'empty', msg: '' };
+    
+    if (key === 'vin') {
+      const normalized = normalizeVin(raw);
+      const isValid = normalized ? isValidVin(normalized) : false;
+      const len = normalized ? normalized.length : 0;
+      return {
+        status: isValid ? 'valid' : 'invalid',
+        msg: `${len} / 17 znaków ${isValid ? '✓ Poprawny format' : '✗ Niepoprawny (bez I/O/Q)'}`
+      };
+    }
+    
+    if (key === 'licensePlate') {
+      const normalized = normalizeLicensePlate(raw);
+      const isValid = normalized ? isValidLicensePlate(normalized) : false;
+      return {
+        status: isValid ? 'valid' : 'invalid',
+        msg: normalized ? `"${normalized}" ${isValid ? '✓ Poprawny' : '✗ Niepoprawny (5-8 znaków A-Z/0-9)'}` : '✗ Wymagane pole'
+      };
+    }
+    
+    if (key === 'firstRegistration') {
+      const normalized = normalizeDateForCepik(raw);
+      const isValid = normalized ? /^\d{4}-\d{2}-\d{2}$/.test(normalized) : false;
+      return {
+        status: isValid ? 'valid' : 'invalid',
+        msg: normalized ? (isValid ? '✓ Data prawidłowa' : '✗ Format YYYY-MM-DD') : '✗ Wymagane pole'
+      };
+    }
+    
+    return { status: 'empty', msg: '' };
   };
 
   const startEdit = key => {
@@ -1237,21 +1294,16 @@ export default function App() {
           <button type="button" className={`tab${tab === "analyze" ? " on" : ""}`} onClick={() => setTab("analyze")}>
             Analiza
           </button>
-          <button type="button" className={`tab${tab === "history" ? " on" : ""}`} onClick={() => setTab("history")}>
+          <button type="button" className={`tab${tab === "history" ? " on" : ""}`} onClick={() => {
+            if (!me) {
+              setShowAuthModal(true);
+            } else {
+              setTab("history");
+            }
+          }}>
             Historia
           </button>
         </div>
-
-        {!me && (
-          <div className="auth-row">
-            <input placeholder="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} autoComplete="username" />
-            <input type="password" placeholder="hasło" value={authPass} onChange={e => setAuthPass(e.target.value)} autoComplete="current-password" />
-            <button type="button" className="act-btn primary" onClick={login}>Loguj</button>
-            <button type="button" className="act-btn" onClick={register}>Rejestracja</button>
-            <span className="mini">Konto wymagane do historii i CEPiK</span>
-            {authErr && <span className="mini" style={{ color: "var(--red)", width: "100%" }}>{authErr}</span>}
-          </div>
-        )}
 
         {tab === "history" && (
           <div style={{ marginBottom: 24 }}>
@@ -1298,22 +1350,36 @@ export default function App() {
                               <>
                                 <input
                                   className="id-input"
+                                  id={`edit-hist-plate-${h.id}`}
                                   value={rowDraft.manual_license_plate ?? ""}
                                   placeholder="np. WX12345"
-                                  onChange={e => setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_license_plate: e.target.value } }))}
+                                  aria-describedby={rowErr.manual_license_plate ? `err-hist-plate-${h.id}` : undefined}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_license_plate: val } }));
+                                    setHistEditValidation(v => ({ ...v, [h.id]: { ...((v[h.id] || {})), manual_license_plate: getValidationStatus('licensePlate', val) } }));
+                                  }}
                                   onPaste={e => {
                                     const pasted = e.clipboardData?.getData("text") ?? "";
                                     if (pasted) {
                                       e.preventDefault();
-                                      setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_license_plate: normalizeLicensePlate(pasted) } }));
+                                      const normalized = normalizeLicensePlate(pasted);
+                                      setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_license_plate: normalized } }));
+                                      setPasteMsg(`Wklejono: "${pasted}" → "${normalized}" ✓`);
+                                      setTimeout(() => setPasteMsg(null), 3000);
                                     }
                                   }}
                                 />
+                                {histEditValidation[h.id]?.manual_license_plate && (
+                                  <div className={`validation-msg ${histEditValidation[h.id].manual_license_plate.status}`}>
+                                    {histEditValidation[h.id].manual_license_plate.msg}
+                                  </div>
+                                )}
                                 <div className="edit-actions">
                                   <button type="button" className="edit-btn" onClick={() => histConfirmEdit(h.id, "manual_license_plate")}>Zapisz</button>
                                   <button type="button" className="edit-btn" onClick={() => histCancelEdit(h.id, "manual_license_plate")}>Anuluj</button>
                                 </div>
-                                {rowErr.manual_license_plate && <div className="edit-err">{rowErr.manual_license_plate}</div>}
+                                {rowErr.manual_license_plate && <div className="edit-err" id={`err-hist-plate-${h.id}`}>{rowErr.manual_license_plate}</div>}
                               </>
                             ) : (
                               <button
@@ -1331,12 +1397,29 @@ export default function App() {
                             <div className="k">VIN</div>
                             {rowMode.manual_vin ? (
                               <>
-                                <input className="id-input" value={rowDraft.manual_vin ?? ""} placeholder="17 znaków" onChange={e => setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_vin: e.target.value } }))} maxLength={17} />
+                                <input 
+                                  className="id-input" 
+                                  id={`edit-hist-vin-${h.id}`}
+                                  value={rowDraft.manual_vin ?? ""} 
+                                  placeholder="17 znaków"
+                                  aria-describedby={rowErr.manual_vin ? `err-hist-vin-${h.id}` : undefined}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_vin: val } }));
+                                    setHistEditValidation(v => ({ ...v, [h.id]: { ...((v[h.id] || {})), manual_vin: getValidationStatus('vin', val) } }));
+                                  }} 
+                                  maxLength={17} 
+                                />
+                                {histEditValidation[h.id]?.manual_vin && (
+                                  <div className={`validation-msg ${histEditValidation[h.id].manual_vin.status}`}>
+                                    {histEditValidation[h.id].manual_vin.msg}
+                                  </div>
+                                )}
                                 <div className="edit-actions">
                                   <button type="button" className="edit-btn" onClick={() => histConfirmEdit(h.id, "manual_vin")}>Zapisz</button>
                                   <button type="button" className="edit-btn" onClick={() => histCancelEdit(h.id, "manual_vin")}>Anuluj</button>
                                 </div>
-                                {rowErr.manual_vin && <div className="edit-err">{rowErr.manual_vin}</div>}
+                                {rowErr.manual_vin && <div className="edit-err" id={`err-hist-vin-${h.id}`}>{rowErr.manual_vin}</div>}
                               </>
                             ) : (
                               <button
@@ -1358,14 +1441,25 @@ export default function App() {
                                   type="date"
                                   lang="pl-PL"
                                   className="id-input"
+                                  id={`edit-hist-date-${h.id}`}
                                   value={rowDraft.manual_first_registration ?? ""}
-                                  onChange={e => setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_first_registration: e.target.value } }))}
+                                  aria-describedby={rowErr.manual_first_registration ? `err-hist-date-${h.id}` : undefined}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_first_registration: val } }));
+                                    setHistEditValidation(v => ({ ...v, [h.id]: { ...((v[h.id] || {})), manual_first_registration: getValidationStatus('firstRegistration', val) } }));
+                                  }}
                                 />
+                                {histEditValidation[h.id]?.manual_first_registration && (
+                                  <div className={`validation-msg ${histEditValidation[h.id].manual_first_registration.status}`}>
+                                    {histEditValidation[h.id].manual_first_registration.msg}
+                                  </div>
+                                )}
                                 <div className="edit-actions">
                                   <button type="button" className="edit-btn" onClick={() => histConfirmEdit(h.id, "manual_first_registration")}>Zapisz</button>
                                   <button type="button" className="edit-btn" onClick={() => histCancelEdit(h.id, "manual_first_registration")}>Anuluj</button>
                                 </div>
-                                {rowErr.manual_first_registration && <div className="edit-err">{rowErr.manual_first_registration}</div>}
+                                {rowErr.manual_first_registration && <div className="edit-err" id={`err-hist-date-${h.id}`}>{rowErr.manual_first_registration}</div>}
                               </>
                             ) : (
                               <button
@@ -1450,6 +1544,9 @@ export default function App() {
                     <span
                       className={`cmp-badge ${comparisonLookup.brand.status}`}
                       title={checkTooltip(comparisonLookup.brand)}
+                      role="img"
+                      aria-label={`Brand verification: ${checkTooltip(comparisonLookup.brand)}`}
+                      tabIndex="0"
                     >
                       {checkIcon(comparisonLookup.brand.status)}
                     </span>
@@ -1461,6 +1558,9 @@ export default function App() {
                     <span
                       className={`cmp-badge ${comparisonLookup.model.status}`}
                       title={checkTooltip(comparisonLookup.model)}
+                      role="img"
+                      aria-label={`Model verification: ${checkTooltip(comparisonLookup.model)}`}
+                      tabIndex="0"
                     >
                       {checkIcon(comparisonLookup.model.status)}
                     </span>
@@ -1475,6 +1575,11 @@ export default function App() {
                     {data.price.toLocaleString("pl-PL")}
                   </div>
                   <div className="price-note">CENA BRUTTO</div>
+                  {cepik && (
+                    <div className={`verification-badge ${cepik.comparison?.severity === 'red' ? 'red' : cepik.comparison?.severity === 'yellow' ? 'yellow' : 'green'}`}>
+                      {cepik.comparison?.severity === 'red' ? '🚨 Uwagi' : cepik.comparison?.severity === 'yellow' ? '⚠️ Przejrzyj' : '✓ Zweryfikowane'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1502,7 +1607,13 @@ export default function App() {
                         </button>
                       )}
                       {check && (
-                        <span className={`cmp-badge ${check.status}`}>
+                        <span 
+                          className={`cmp-badge ${check.status}`}
+                          role="img"
+                          aria-label={`${f.lbl} verification: ${checkTooltip(check)}`}
+                          title={checkTooltip(check)}
+                          tabIndex="0"
+                        >
                           {checkIcon(check.status)}
                         </span>
                       )}
@@ -1513,14 +1624,25 @@ export default function App() {
                           type="date"
                           className="id-input"
                           lang="pl-PL"
+                          id="edit-firstRegistration"
+                          aria-describedby={editErr.firstRegistration ? "err-firstRegistration" : undefined}
                           value={editDraft.firstRegistration}
-                          onChange={e => setEditDraft(d => ({ ...d, firstRegistration: e.target.value }))}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setEditDraft(d => ({ ...d, firstRegistration: val }));
+                            setEditValidation(v => ({ ...v, firstRegistration: getValidationStatus('firstRegistration', val) }));
+                          }}
                         />
+                        {editValidation.firstRegistration && editValidation.firstRegistration.msg && (
+                          <div className={`validation-msg ${editValidation.firstRegistration.status}`} style={{ marginTop: 4 }}>
+                            {editValidation.firstRegistration.msg}
+                          </div>
+                        )}
                         <div className="edit-actions" style={{ marginTop: 8 }}>
                           <button type="button" className="edit-btn" onClick={() => confirmEdit("firstRegistration")}>Zapisz</button>
                           <button type="button" className="edit-btn" onClick={() => cancelEdit("firstRegistration")}>Anuluj</button>
                         </div>
-                        {editErr.firstRegistration && <div className="edit-err">{editErr.firstRegistration}</div>}
+                        {editErr.firstRegistration && <div className="edit-err" id="err-firstRegistration">{editErr.firstRegistration}</div>}
                       </>
                     ) : (
                       <div className={`spec-val${nil ? " nil" : ""}`}>
@@ -1544,23 +1666,37 @@ export default function App() {
                     <>
                       <input
                         className="id-input"
+                        id="edit-licensePlate"
                         placeholder="np. WX 12345"
+                        aria-describedby={editErr.licensePlate ? "err-licensePlate" : undefined}
                         value={editDraft.licensePlate}
-                        onChange={e => setEditDraft(d => ({ ...d, licensePlate: e.target.value }))}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditDraft(d => ({ ...d, licensePlate: val }));
+                          setEditValidation(v => ({ ...v, licensePlate: getValidationStatus('licensePlate', val) }));
+                        }}
                         onPaste={e => {
                           const pasted = e.clipboardData?.getData("text") ?? "";
                           if (pasted) {
                             e.preventDefault();
-                            setEditDraft(d => ({ ...d, licensePlate: normalizeLicensePlate(pasted) }));
+                            const normalized = normalizeLicensePlate(pasted);
+                            setEditDraft(d => ({ ...d, licensePlate: normalized }));
+                            setPasteMsg(`Wklejono: "${pasted}" → "${normalized}" ✓`);
+                            setTimeout(() => setPasteMsg(null), 3000);
                           }
                         }}
                         maxLength={20}
                       />
+                      {editValidation.licensePlate && editValidation.licensePlate.msg && (
+                        <div className={`validation-msg ${editValidation.licensePlate.status}`}>
+                          {editValidation.licensePlate.msg}
+                        </div>
+                      )}
                       <div className="edit-actions" style={{ marginTop: 8 }}>
                         <button type="button" className="edit-btn" onClick={() => confirmEdit("licensePlate")}>Zapisz</button>
                         <button type="button" className="edit-btn" onClick={() => cancelEdit("licensePlate")}>Anuluj</button>
                       </div>
-                      {editErr.licensePlate && <div className="edit-err">{editErr.licensePlate}</div>}
+                      {editErr.licensePlate && <div className="edit-err" id="err-licensePlate">{editErr.licensePlate}</div>}
                     </>
                   ) : (
                     <div className={`id-val${!data.licensePlate ? " nil" : ""}`}>{data.licensePlate ?? "Niedostępne"}</div>
@@ -1590,16 +1726,27 @@ export default function App() {
                     <>
                       <input
                         className="id-input"
+                        id="edit-vin"
                         placeholder="Wpisz VIN ręcznie"
+                        aria-describedby={editErr.vin ? "err-vin" : undefined}
                         value={editDraft.vin}
-                        onChange={e => setEditDraft(d => ({ ...d, vin: e.target.value }))}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditDraft(d => ({ ...d, vin: val }));
+                          setEditValidation(v => ({ ...v, vin: getValidationStatus('vin', val) }));
+                        }}
                         maxLength={17}
                       />
+                      {editValidation.vin && editValidation.vin.msg && (
+                        <div className={`validation-msg ${editValidation.vin.status}`}>
+                          {editValidation.vin.msg}
+                        </div>
+                      )}
                       <div className="edit-actions" style={{ marginTop: 8 }}>
                         <button type="button" className="edit-btn" onClick={() => confirmEdit("vin")}>Zapisz</button>
                         <button type="button" className="edit-btn" onClick={() => cancelEdit("vin")}>Anuluj</button>
                       </div>
-                      {editErr.vin && <div className="edit-err">{editErr.vin}</div>}
+                      {editErr.vin && <div className="edit-err" id="err-vin">{editErr.vin}</div>}
                     </>
                   ) : (
                     <div className={`id-val${!data.vin ? " nil" : ""}`}>{data.vin ?? "Niedostępne"}</div>
@@ -1650,37 +1797,64 @@ export default function App() {
             )}
             {cepik && (
               <div className="cepik-panel">
+                <div className="cepik-disclaimer">
+                  ⚠️ <strong>Weryfikacja rządowa (CEPiK)</strong> — Dane pochodzą z oficjalnego rejestru pojazdów. Niezbieżności mogą wynikać z błędów edycji lub niedawnych aktualizacji.
+                </div>
+                
                 <div className="cepik-title">
                   Weryfikacja moj.gov.pl
                   {cepik.meta?.cacheHit != null && (
                     <span className="meta-pill">{cepik.meta.cacheHit ? "cache hit" : "świeże dane"}</span>
                   )}
                 </div>
+
                 {cepik.comparison?.checks?.length > 0 && (
-                  <div style={{ marginBottom: 14 }}>
-                    {cepik.comparison.checks.map((c, i) => (
-                      <div className="check-row" key={i} title={c.message || ""}>
-                        <span className="check-ico">{c.status === "ok" ? "✓" : c.status === "warning" ? "!" : "○"}</span>
-                        <span className="check-field">{c.field}</span>
-                        <span className="check-msg">
-                          {c.message || `${JSON.stringify(c.listing)} → ${JSON.stringify(c.cepi)}`}
-                        </span>
+                  <div style={{ marginTop: 12 }}>
+                    <div className="cepik-comparison-table">
+                      <div className="cepik-row">
+                        <div className="cepik-cell header">Pole</div>
+                        <div className="cepik-cell header">Ogłoszenie</div>
+                        <div className="cepik-cell header">CEPiK</div>
+                        <div className="cepik-cell header">Status</div>
+                      </div>
+                      {cepik.comparison.checks.map((c, i) => (
+                        <div 
+                          key={i} 
+                          className="cepik-row"
+                          style={{ background: c.status === 'warning' ? 'var(--border)' : undefined }}
+                        >
+                          <div className={`cepik-cell ${c.status === 'warning' ? 'mismatch' : ''}`}>{c.field}</div>
+                          <div className={`cepik-cell value ${c.status === 'warning' ? 'mismatch' : ''}`}>{JSON.stringify(c.listing)}</div>
+                          <div className={`cepik-cell value ${c.status === 'warning' ? 'mismatch' : ''}`}>{JSON.stringify(c.cepi)}</div>
+                          <div className={`cepik-cell status ${c.status === 'warning' ? 'mismatch' : ''}`}>
+                            {c.status === 'ok' ? '✓' : c.status === 'warning' ? '⚠' : '○'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {cepik.odometerReadings?.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div className="cepik-title">Historia przebiegu</div>
+                    {cepik.odometerReadings.map((r, i) => (
+                      <div key={i} className="check-row" style={{ borderBottom: i === cepik.odometerReadings.length - 1 ? 'none' : '1px solid var(--border)' }}>
+                        <span className="check-field">{r.date || 'Brak daty'}</span>
+                        <span className="check-msg">{(r.mileage || 0).toLocaleString('pl-PL')} km</span>
                       </div>
                     ))}
                   </div>
                 )}
-                <div className="desc-lbl" style={{ marginTop: 8 }}>Odczyty przebiegu (CEPiK)</div>
-                <pre style={{ fontSize: 11, marginTop: 6, whiteSpace: "pre-wrap", color: "var(--sub)" }}>
-                  {JSON.stringify(cepik.odometerReadings || [], null, 2)}
-                </pre>
-                <div className="desc-lbl" style={{ marginTop: 12 }}>Zdarzenia (timeline)</div>
-                <pre style={{ fontSize: 11, marginTop: 6, whiteSpace: "pre-wrap", color: "var(--sub)" }}>
-                  {JSON.stringify(cepik.events || [], null, 2)}
-                </pre>
-                <div className="desc-lbl" style={{ marginTop: 12 }}>Dane techniczne (znormalizowane)</div>
-                <pre style={{ fontSize: 11, marginTop: 6, whiteSpace: "pre-wrap", color: "var(--sub)" }}>
-                  {JSON.stringify(cepik.technicalData || {}, null, 2)}
-                </pre>
+
+                {cepik.events?.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div className="cepik-title">Zdarzenia (timeline)</div>
+                    <div style={{ fontSize: 10, color: 'var(--sub)', whiteSpace: 'pre-wrap' }}>
+                      {cepik.events.map((e, i) => `${i+1}. ${e.type || 'Unknown'} - ${e.date || 'Brak daty'}`).join('\n')}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1711,6 +1885,56 @@ export default function App() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {pasteMsg && (
+          <div className="paste-toast">
+            ✓ {pasteMsg}
+          </div>
+        )}
+
+        {showAuthModal && (
+          <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <button 
+                className="modal-close" 
+                onClick={() => setShowAuthModal(false)}
+                type="button"
+              >
+                ✕
+              </button>
+              <div className="modal-header">Logowanie</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input 
+                  type="email"
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  className="id-input"
+                  autoComplete="username"
+                  onKeyDown={e => e.key === 'Enter' && login()}
+                />
+                <input 
+                  type="password"
+                  placeholder="Hasło"
+                  value={authPass}
+                  onChange={e => setAuthPass(e.target.value)}
+                  className="id-input"
+                  autoComplete="current-password"
+                  onKeyDown={e => e.key === 'Enter' && login()}
+                />
+                {authErr && <div className="err"><span className="err-ico">⚠</span>{authErr}</div>}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" className="act-btn primary" onClick={login} style={{ flex: 1 }}>
+                    Loguj
+                  </button>
+                  <button type="button" className="act-btn" onClick={register} style={{ flex: 1 }}>
+                    Rejestracja
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
