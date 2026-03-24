@@ -38,16 +38,18 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .err{margin-top:24px;border:1px solid var(--red);background:#e0454510;border-radius:4px;padding:18px 22px;font-family:var(--ff-m);font-size:12px;color:var(--red);animation:fadeUp .3s ease;display:flex;gap:12px;align-items:flex-start;line-height:1.6}
 .err-ico{font-size:16px;flex-shrink:0}
 .result{margin-top:32px;animation:fadeUp .4s ease}
-.car-hero{position:relative;overflow:hidden;border:1px solid var(--border2);border-radius:4px 4px 0 0;background:var(--card);padding:30px 32px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.car-hero{position:relative;border:1px solid var(--border2);border-radius:4px 4px 0 0;background:var(--card);padding:28px 32px;display:grid;grid-template-columns:220px 1fr 280px;gap:28px;align-items:center}
 .car-hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--amber),var(--amber) 40%,transparent)}
-.ch-src{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
-.ch-brand{font-family:var(--ff-d);font-size:13px;letter-spacing:4px;color:var(--amber)}
-.ch-model{font-family:var(--ff-d);font-size:52px;line-height:1;letter-spacing:1px}
-.ch-variant{font-size:13px;color:var(--sub);margin-top:5px;font-weight:300}
-.ch-price{text-align:right;flex-shrink:0}
-.price-val{font-family:var(--ff-d);font-size:46px;line-height:1;color:var(--amber)}
-.price-cur{font-size:22px;margin-right:3px}
-.price-note{font-family:var(--ff-m);font-size:9px;color:var(--sub);margin-top:4px;letter-spacing:1px}
+.car-hero-img{width:220px;height:165px;border-radius:4px;object-fit:cover;background:var(--card2)}
+.car-hero-info{display:flex;flex-direction:column;gap:8px}
+.ch-src{font-family:var(--ff-m);font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
+.ch-brand{font-family:var(--ff-m);font-size:20px;color:var(--sub);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px}
+.ch-model{font-family:var(--ff-d);font-size:48px;line-height:1.1;letter-spacing:0px;color:var(--text);font-weight:700;margin-bottom:4px}
+.ch-variant{font-size:12px;color:var(--sub);font-weight:400}
+.ch-price{display:flex;flex-direction:column;gap:12px;justify-content:flex-start}
+.price-val{font-family:var(--ff-d);font-size:48px;line-height:1;color:var(--amber);font-weight:700}
+.price-cur{font-size:18px;margin-right:4px}
+.price-note{font-family:var(--ff-m);font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
 .specs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-top:1px}
 .spec{background:var(--card);padding:16px 18px;transition:background .15s;cursor:default}
 .spec:hover{background:var(--card2)}
@@ -60,8 +62,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .cmp-badge.ok{color:var(--green);border-color:#3db87a66;background:#3db87a1a}
 .cmp-badge.warning{color:var(--red);border-color:#e0454566;background:#e045451a}
 .cmp-badge.check{color:var(--amber);border-color:#f0a50066;background:#f0a5001a}
-.hero-line{display:flex;align-items:center;gap:10px}
-.hero-line .cmp-badge{width:20px;height:20px;font-size:12px}
+.hero-line{display:flex;align-items:center;gap:6px}
+.hero-line .cmp-badge{width:16px;height:16px;font-size:10px}
 .identity{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-top:1px}
 .id-card{background:var(--card);padding:18px 22px;display:flex;align-items:center;gap:16px}
 .id-ico{font-size:22px;opacity:.45;flex-shrink:0}
@@ -92,8 +94,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:680px){
   .specs{grid-template-columns:repeat(2,1fr)}.identity{grid-template-columns:1fr}
-  .gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.car-hero{flex-direction:column}
-  .ch-price{text-align:left}.ch-model{font-size:38px}.price-val{font-size:34px}
+  .gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.car-hero{grid-template-columns:1fr;gap:12px;padding:16px}
+  .car-hero-img{width:100%;height:auto;min-height:140px}.car-hero-info{gap:6px}.ch-model{font-size:32px}.price-val{font-size:36px}.ch-price{gap:8px}
   .actions{flex-direction:column}.hdr{padding:12px 16px}.main{padding:28px 16px 60px}
 }
 .tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border2);padding-bottom:8px}
@@ -1535,9 +1537,13 @@ export default function App() {
 
         {tab === "analyze" && data && (
           <div className="result">
-            <div className="car-hero">
-              <div>
                 {data.portal && <div className="ch-src">ŹRÓDŁO: {data.portal}</div>}
+
+            <div className="car-hero">
+              {data.images?.[0] && (
+                <img src={data.images[0]} alt="First listing image" className="car-hero-img" />
+              )}
+              <div className="car-hero-info">
                 <div className="hero-line">
                   <div className="ch-brand">{data.brand ?? "NIEZNANA MARKA"}</div>
                   {comparisonLookup.brand && (
@@ -1566,7 +1572,6 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                {data.variant && <div className="ch-variant">{data.variant}</div>}
               </div>
               {data.price && (
                 <div className="ch-price">
