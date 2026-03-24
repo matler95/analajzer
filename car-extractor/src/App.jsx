@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch, setTokens, clearTokens, getTokens, API_BASE } from "./api.js";
 
 const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -51,9 +52,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .spec{background:var(--card);padding:16px 18px;transition:background .15s;cursor:default}
 .spec:hover{background:var(--card2)}
 .spec-lbl{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
+.spec-lbl-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
 .spec-val{font-family:var(--ff-m);font-size:14px;font-weight:600;color:var(--text)}
 .spec-val .u{font-size:10px;color:var(--sub);font-weight:400;margin-left:3px}
 .spec-val.nil{color:var(--muted);font-weight:400;font-size:12px}
+.cmp-badge{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;font-family:var(--ff-m);font-size:11px;border:1px solid var(--border2);color:var(--sub);background:var(--card2);line-height:1}
+.cmp-badge.ok{color:var(--green);border-color:#3db87a66;background:#3db87a1a}
+.cmp-badge.warning{color:var(--red);border-color:#e0454566;background:#e045451a}
+.cmp-badge.check{color:var(--amber);border-color:#f0a50066;background:#f0a5001a}
+.hero-line{display:flex;align-items:center;gap:10px}
+.hero-line .cmp-badge{width:20px;height:20px;font-size:12px}
 .identity{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-top:1px}
 .id-card{background:var(--card);padding:18px 22px;display:flex;align-items:center;gap:16px}
 .id-ico{font-size:22px;opacity:.45;flex-shrink:0}
@@ -87,8 +95,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
   .ch-price{text-align:left}.ch-model{font-size:38px}.price-val{font-size:34px}
   .actions{flex-direction:column}.hdr{padding:12px 16px}.main{padding:28px 16px 60px}
 }
+.tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border2);padding-bottom:8px}
+.tab{background:transparent;border:none;font-family:var(--ff-d);font-size:14px;letter-spacing:2px;color:var(--sub);padding:8px 16px;cursor:pointer;border-radius:4px 4px 0 0}
+.tab:hover{color:var(--text)}.tab.on{color:var(--amber);background:var(--amber-bg)}
+.auth-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;padding:12px 14px;border:1px solid var(--border2);border-radius:4px;background:var(--card)}
+.auth-row input{background:var(--card2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--ff-m);font-size:12px;min-width:140px}
+.auth-row .mini{font-family:var(--ff-m);font-size:10px;color:var(--sub)}
+.history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.hist-card{border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);cursor:pointer;text-align:left;transition:border-color .15s}
+.hist-card:hover{border-color:var(--amber)}
+.hist-card img{width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--card2)}
+.hist-body{padding:10px 12px}
+.hist-title{font-family:var(--ff-d);font-size:16px;letter-spacing:1px}
+.hist-meta{font-family:var(--ff-m);font-size:9px;color:var(--sub);margin-top:4px}
+.cepik-panel{margin-top:16px;border:1px solid var(--border2);border-radius:4px;background:var(--card);padding:16px 18px}
+.cepik-title{font-family:var(--ff-m);font-size:10px;color:var(--amber);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.check-row{display:flex;align-items:flex-start;gap:10px;font-family:var(--ff-m);font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)}
+.check-row:last-child{border-bottom:none}
+.check-ico{flex-shrink:0;width:20px;text-align:center}
+.check-field{flex:1;color:var(--sub);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.check-msg{flex:2;color:var(--text);line-height:1.4}
+.meta-pill{display:inline-block;font-size:9px;padding:2px 8px;border-radius:10px;background:var(--card2);color:var(--sub);margin-left:8px}
 @media print{
-  .hdr,.input-area,.actions,.note{display:none!important}
+  .hdr,.input-area,.actions,.note,.tabs,.auth-row,.cepik-panel{display:none!important}
   .app{background:white!important;background-image:none!important}body{color:#000!important}
   .car-hero,.spec,.id-card,.src-bar{background:white!important;border-color:#ddd!important}
   .ch-model,.spec-val,.id-val{color:#000!important}.ch-brand,.price-val{color:#c47a00!important}
@@ -162,10 +191,38 @@ async function fetchPage(url) {
 
 const toNum = v => {
   if (v == null) return null;
-  const n = parseFloat(
-    String(v).replace(/\s/g, "").replace(",", ".").replace(/[^\d.]/g, "")
-  );
-  return isNaN(n) ? null : n;
+  const original = String(v).toLowerCase();
+  let s = String(v)
+    .replace(/\u00a0/g, " ")
+    .replace(/[^\d,.\s]/g, "")
+    .replace(/\s+/g, "");
+  if (!s) return null;
+  // 127.000 / 127,000 -> 127000
+  if (/^\d{1,3}([.,]\d{3})+$/.test(s)) {
+    s = s.replace(/[.,]/g, "");
+  } else if (s.includes(",") && !s.includes(".")) {
+    s = /,\d{1,2}$/.test(s) ? s.replace(",", ".") : s.replace(/,/g, "");
+  } else if (s.includes(".") && !s.includes(",")) {
+    s = /\.\d{1,2}$/.test(s) ? s : s.replace(/\./g, "");
+  } else if (s.includes(".") && s.includes(",")) {
+    // Jeśli oba separatory: traktuj ostatni jako dziesiętny tylko przy 1-2 cyfrach po nim.
+    const lastDot = s.lastIndexOf(".");
+    const lastComma = s.lastIndexOf(",");
+    const idx = Math.max(lastDot, lastComma);
+    const fracLen = s.length - idx - 1;
+    if (fracLen <= 2) {
+      const intPart = s.slice(0, idx).replace(/[.,]/g, "");
+      const frac = s.slice(idx + 1);
+      s = `${intPart}.${frac}`;
+    } else {
+      s = s.replace(/[.,]/g, "");
+    }
+  }
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  // "127 tys." => 127000
+  if (/\btys\b/.test(original) && n < 1000) return Math.round(n * 1000);
+  return n;
 };
 
 const clean = v =>
@@ -272,6 +329,27 @@ function fieldNum(md, ...labels) {
 function findNumUnit(md, unitRe) {
   const m = md.match(new RegExp(`([0-9][\\d\\s.,\u00a0]*)\\s*${unitRe}`, "i"));
   return m ? toNum(m[1]) : null;
+}
+
+function extractMileage(md, kv) {
+  const candidates = [];
+  const kvMileage = fromKv(kv, "Przebieg", "Przebieg (km)", "Mileage");
+  if (kvMileage) candidates.push(toNum(kvMileage));
+  const fieldMileage = field(md, "Przebieg", "Przebieg (km)", "Mileage");
+  if (fieldMileage) candidates.push(toNum(fieldMileage));
+
+  // Najbardziej precyzyjny wzorzec: liczba bezpośrednio przy etykiecie "Przebieg".
+  const nearLabel = md.match(/Przebieg[\s:|\-*]*\n?\s*([0-9][\d\s.,\u00a0]*(?:\s*tys\.?)?)\s*km\b/i);
+  if (nearLabel?.[1]) candidates.push(toNum(nearLabel[1]));
+
+  // Fallback globalny.
+  candidates.push(findNumUnit(md, "km\\b"));
+
+  const valid = candidates.filter(n => Number.isFinite(n));
+  if (!valid.length) return null;
+
+  // Dla przebiegu wolimy największą sensowną wartość (unika zaniżenia do 127 z "127 tys.")
+  return Math.max(...valid);
 }
 
 function detectPortal(url) {
@@ -402,7 +480,7 @@ function parseMd(md, url) {
     brand, model, variant,
     year,
     price, currency,
-    mileage: fieldNum(fromKv(kv, "Przebieg", "Przebieg (km)", "Mileage")) ?? fieldNum(md, "Przebieg", "Przebieg (km)", "Mileage") ?? findNumUnit(md, "km\\b"),
+    mileage: extractMileage(md, kv),
     engineDisplacement:
       fieldNum(fromKv(kv, "Pojemność skokowa", "Pojemność", "Engine capacity")) ??
       fieldNum(md, "Pojemność skokowa", "Pojemność", "Engine capacity") ??
@@ -468,6 +546,105 @@ function parseMd(md, url) {
   };
 }
 
+function stripDebug(obj) {
+  if (!obj || typeof obj !== "object") return obj;
+  const { __debug, ...rest } = obj;
+  return rest;
+}
+
+function normalizeDateForCepik(s) {
+  if (!s) return "";
+  const t = String(s).trim();
+  const plMonthMap = {
+    stycznia: "01",
+    lutego: "02",
+    marca: "03",
+    kwietnia: "04",
+    maja: "05",
+    czerwca: "06",
+    lipca: "07",
+    sierpnia: "08",
+    września: "09",
+    wrzesnia: "09",
+    października: "10",
+    pazdziernika: "10",
+    listopada: "11",
+    grudnia: "12",
+  };
+  const iso = t.match(/^(\d{4})[-/.](\d{2})[-/.](\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const pl = t.match(/^(\d{2})[-/.](\d{2})[-/.](\d{4})/);
+  if (pl) return `${pl[3]}-${pl[2]}-${pl[1]}`;
+  const plText = t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
+  if (plText) {
+    const dd = String(plText[1]).padStart(2, "0");
+    const mm = plMonthMap[plText[2]] || null;
+    const yyyy = plText[3];
+    if (mm) return `${yyyy}-${mm}-${dd}`;
+  }
+  if (/^\d{4}$/.test(t)) return `${t}-01-01`;
+  return t;
+}
+
+function buildExportPayload(data, cepikResult) {
+  const base = stripDebug(data);
+  if (!cepikResult) return base;
+  return {
+    ...base,
+    cepik: {
+      technicalData: cepikResult.technicalData,
+      odometerReadings: cepikResult.odometerReadings,
+      events: cepikResult.events,
+      meta: cepikResult.meta,
+      comparison: cepikResult.comparison,
+    },
+  };
+}
+
+function mergeSearchRecord(row) {
+  const snap = row.snapshot_json || {};
+  return {
+    ...snap,
+    listingUrl: row.listing_url || snap.listingUrl,
+    vin: row.manual_vin ?? snap.vin ?? null,
+    firstRegistration: row.manual_first_registration ?? snap.firstRegistration ?? null,
+    licensePlate: row.manual_license_plate ?? snap.licensePlate ?? null,
+  };
+}
+
+/** FastAPI: detail bywa stringiem, tablicą {loc,msg,type} albo obiektem — zawsze na czytelny string pod React. */
+function formatFastApiDetail(detail) {
+  if (detail == null || detail === "") return "";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map(e => {
+        if (typeof e === "string") return e;
+        if (e && typeof e === "object" && e.msg != null) {
+          const loc = Array.isArray(e.loc) ? e.loc.filter(Boolean).join(" · ") : "";
+          return loc ? `${loc}: ${e.msg}` : String(e.msg);
+        }
+        try {
+          return JSON.stringify(e);
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (typeof detail === "object" && detail.msg != null) return String(detail.msg);
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return "Błąd serwera";
+  }
+}
+
 /* ─── FIELDS CONFIG ──────────────────────────────────────── */
 const FIELDS = [
   { key: "year",               lbl: "Rok" },
@@ -484,6 +661,47 @@ const FIELDS = [
   { key: "seats",              lbl: "Miejsca" },
 ];
 
+const COMPARISON_TO_UI = {
+  year: "year",
+  fuelType: "fuelType",
+  engineDisplacement: "engineDisplacement",
+  enginePower: "enginePower",
+  mileage: "mileage",
+  firstRegistration: "firstRegistration",
+  brand: "brand",
+  model: "model",
+};
+
+function normalizeCompareFieldName(name) {
+  const n = String(name ?? "").trim();
+  return COMPARISON_TO_UI[n] || null;
+}
+
+function buildComparisonLookup(cepik) {
+  const checks = cepik?.comparison?.checks;
+  if (!Array.isArray(checks)) return {};
+  const map = {};
+  for (const c of checks) {
+    const key = normalizeCompareFieldName(c?.field);
+    if (key && !map[key]) map[key] = c;
+  }
+  return map;
+}
+
+function checkIcon(status) {
+  if (status === "ok") return "✓";
+  if (status === "warning") return "!";
+  return "○";
+}
+
+function checkTooltip(check) {
+  if (!check) return "";
+  if (check.message) return String(check.message);
+  const left = check.listing != null ? JSON.stringify(check.listing) : "brak danych";
+  const right = check.cepi != null ? JSON.stringify(check.cepi) : "brak danych";
+  return `Ogłoszenie: ${left} | CEPiK: ${right}`;
+}
+
 /* ─── APP ────────────────────────────────────────────────── */
 export default function App() {
   const [url, setUrl] = useState("");
@@ -491,6 +709,19 @@ export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [tab, setTab] = useState("analyze");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [me, setMe] = useState(null);
+  const [authErr, setAuthErr] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
+  const [savedSearchId, setSavedSearchId] = useState(null);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveMsg, setSaveMsg] = useState(null);
+  const [cepik, setCepik] = useState(null);
+  const [cepikLoading, setCepikLoading] = useState(false);
+  const [cepikErr, setCepikErr] = useState(null);
 
   useEffect(() => {
     const el = document.createElement("style");
@@ -499,12 +730,48 @@ export default function App() {
     return () => el.remove();
   }, []);
 
+  const refreshMe = useCallback(async () => {
+    if (!getTokens().access) {
+      setMe(null);
+      return;
+    }
+    const res = await apiFetch("/auth/me");
+    if (res.ok) setMe(await res.json());
+    else setMe(null);
+  }, []);
+
+  useEffect(() => {
+    refreshMe();
+  }, [refreshMe]);
+
+  const loadHistory = useCallback(async () => {
+    setHistLoading(true);
+    try {
+      const res = await apiFetch("/searches");
+      if (res.ok) setHistory(await res.json());
+      else setHistory([]);
+    } finally {
+      setHistLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "history" && me) loadHistory();
+  }, [tab, me, loadHistory]);
+
   const portal = detectPortal(url);
 
   const run = useCallback(async () => {
     const u = url.trim();
     if (!u) return;
-    setLoading(true); setError(null); setData(null); setShowDebug(false);
+    setLoading(true);
+    setError(null);
+    setData(null);
+    setShowDebug(false);
+    setSavedSearchId(null);
+    setCepik(null);
+    setCepikErr(null);
+    setSaveMsg(null);
     try {
       const md = await fetchPage(u);
       const car = parseMd(md, u);
@@ -517,13 +784,161 @@ export default function App() {
     }
   }, [url]);
 
+  const login = async () => {
+    setAuthErr(null);
+    const res = await apiFetch("/auth/login", {
+      method: "POST",
+      body: { email: authEmail, password: authPass },
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setAuthErr(formatFastApiDetail(j.detail) || "Błąd logowania");
+      return;
+    }
+    setTokens(j.access_token, j.refresh_token);
+    setAuthPass("");
+    refreshMe();
+  };
+
+  const register = async () => {
+    setAuthErr(null);
+    const res = await apiFetch("/auth/register", {
+      method: "POST",
+      body: { email: authEmail, password: authPass },
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setAuthErr(formatFastApiDetail(j.detail) || "Błąd rejestracji");
+      return;
+    }
+    setTokens(j.access_token, j.refresh_token);
+    setAuthPass("");
+    refreshMe();
+  };
+
+  const logout = () => {
+    clearTokens();
+    setMe(null);
+    setHistory([]);
+    setSavedSearchId(null);
+  };
+
+  const openHistoryItem = async id => {
+    const res = await apiFetch(`/searches/${id}`);
+    if (!res.ok) return;
+    const row = await res.json();
+    setData(mergeSearchRecord(row));
+    setSavedSearchId(row.id);
+    setCepik(null);
+    setCepikErr(null);
+    if (row.latest_verification?.normalized) {
+      setCepik({
+        technicalData: row.latest_verification.normalized.technicalData || {},
+        odometerReadings: row.latest_verification.normalized.odometerReadings || [],
+        events: row.latest_verification.normalized.events || [],
+        meta: { fromHistory: true, cacheHit: row.latest_verification.cache_hit },
+        comparison: row.latest_verification.comparison || null,
+      });
+    }
+    setTab("analyze");
+  };
+
+  const persistManualToServer = async id => {
+    if (!id || !me) return;
+    await apiFetch(`/searches/${id}`, {
+      method: "PATCH",
+      body: {
+        manual_vin: data.vin || null,
+        manual_first_registration: data.firstRegistration || null,
+        manual_license_plate: data.licensePlate || null,
+      },
+    });
+  };
+
+  const saveSearch = async () => {
+    if (!data || !me) return;
+    setSaveBusy(true);
+    setSaveMsg(null);
+    try {
+      const res = await apiFetch("/searches", {
+        method: "POST",
+        body: {
+          listing_url: data.listingUrl,
+          snapshot_json: stripDebug(data),
+          manual_vin: data.vin || null,
+          manual_first_registration: data.firstRegistration || null,
+          manual_license_plate: data.licensePlate || null,
+        },
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveMsg(formatFastApiDetail(j.detail) || "Nie zapisano");
+        return;
+      }
+      setSavedSearchId(j.id);
+      setSaveMsg("Zapisano w historii.");
+      loadHistory();
+    } finally {
+      setSaveBusy(false);
+    }
+  };
+
+  const verifyGov = async () => {
+    if (!data) return;
+    const reg = (data.licensePlate || "").trim();
+    const vin = (data.vin || "").trim();
+    const fr = normalizeDateForCepik(data.firstRegistration || "");
+    if (!reg || !vin || !fr) {
+      setCepikErr("Uzupełnij VIN, numer rejestracyjny i datę pierwszej rejestracji (YYYY-MM-DD).");
+      return;
+    }
+    if (!me) {
+      setCepikErr("Zaloguj się, aby weryfikować przez API.");
+      return;
+    }
+    setCepikLoading(true);
+    setCepikErr(null);
+    try {
+      if (savedSearchId) await persistManualToServer(savedSearchId);
+      const res = await apiFetch("/cepik/verify", {
+        method: "POST",
+        body: {
+          search_id: savedSearchId,
+          registration_number: reg,
+          vin_number: vin,
+          first_registration_date: fr,
+          listing_snapshot: stripDebug(data),
+          force_refresh: false,
+        },
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCepikErr(typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail || j));
+        setCepik(null);
+        return;
+      }
+      setCepik(j);
+    } catch (e) {
+      throw e;
+    } finally {
+      setCepikLoading(false);
+    }
+  };
+
+  const canVerify =
+    me &&
+    data &&
+    (data.licensePlate || "").trim() &&
+    (data.vin || "").trim() &&
+    normalizeDateForCepik(data.firstRegistration || "");
+  const comparisonLookup = buildComparisonLookup(cepik);
+
   const dlJSON = () => {
     if (!data) return;
     const name = [data.brand, data.model, data.year].filter(Boolean).join("-");
+    const payload = buildExportPayload(data, cepik);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(
-      new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
-    );
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
     a.download = `raport-${name || "pojazd"}-${Date.now()}.json`;
     a.click();
   };
@@ -536,10 +951,67 @@ export default function App() {
           <div className="hdr-title">VEHICLE EXTRACTOR</div>
           <div className="hdr-sub">OTOMOTO · OLX · via Jina AI Reader</div>
         </div>
-        <div className="hdr-pill">BEZ KLUCZA · BEZ CORS</div>
+        <div className="hdr-pill">
+          {me ? `✓ ${me.email}` : "API: " + API_BASE.replace(/^https?:\/\//, "")}
+        </div>
       </header>
 
       <div className="main">
+        <div className="tabs">
+          <button type="button" className={`tab${tab === "analyze" ? " on" : ""}`} onClick={() => setTab("analyze")}>
+            Analiza
+          </button>
+          <button type="button" className={`tab${tab === "history" ? " on" : ""}`} onClick={() => setTab("history")}>
+            Historia
+          </button>
+        </div>
+
+        <div className="auth-row">
+          {me ? (
+            <>
+              <span className="mini">Zalogowano jako <strong style={{ color: "var(--text)" }}>{me.email}</strong></span>
+              <button type="button" className="act-btn" onClick={logout}>Wyloguj</button>
+            </>
+          ) : (
+            <>
+              <input placeholder="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} autoComplete="username" />
+              <input type="password" placeholder="hasło" value={authPass} onChange={e => setAuthPass(e.target.value)} autoComplete="current-password" />
+              <button type="button" className="act-btn primary" onClick={login}>Loguj</button>
+              <button type="button" className="act-btn" onClick={register}>Rejestracja</button>
+              <span className="mini">Konto wymagane do historii i CEPiK</span>
+            </>
+          )}
+          {authErr && <span className="mini" style={{ color: "var(--red)", width: "100%" }}>{authErr}</span>}
+        </div>
+
+        {tab === "history" && (
+          <div style={{ marginBottom: 24 }}>
+            <div className="section-label">Zapisane wyszukiwania</div>
+            {histLoading && <div className="load-msg">Ładowanie…</div>}
+            {!me && <div className="note">Zaloguj się, aby zobaczyć historię.</div>}
+            {me && !histLoading && history.length === 0 && <div className="note">Brak zapisanych wyszukiwań.</div>}
+            {me && (
+              <div className="history-grid">
+                {history.map(h => {
+                  const snap = h.snapshot_json || {};
+                  const img = snap.images?.[0];
+                  const title = [snap.brand, snap.model, snap.year].filter(Boolean).join(" ") || "Pojazd";
+                  return (
+                    <button type="button" key={h.id} className="hist-card" onClick={() => openHistoryItem(h.id)}>
+                      {img ? <img src={img} alt="" /> : <div style={{ aspectRatio: "16/10", background: "var(--card2)" }} />}
+                      <div className="hist-body">
+                        <div className="hist-title">{title}</div>
+                        <div className="hist-meta">{new Date(h.created_at).toLocaleString("pl-PL")}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "analyze" && (
         <div className="input-area">
           <div className="section-label">URL ogłoszenia</div>
           <div className="input-wrap">
@@ -562,28 +1034,49 @@ export default function App() {
             <span className="hint-dot">·</span> Działa przez r.jina.ai — bez klucza API
           </div>
         </div>
+        )}
 
-        {loading && (
+        {tab === "analyze" && loading && (
           <div className="loader">
             <div className="spin" />
             <div className="load-msg">▶ Pobieranie przez Jina AI…</div>
           </div>
         )}
 
-        {error && (
+        {tab === "analyze" && error && (
           <div className="err">
             <span className="err-ico">⚠</span>
             <div><strong>Błąd</strong> — {error}</div>
           </div>
         )}
 
-        {data && (
+        {tab === "analyze" && data && (
           <div className="result">
             <div className="car-hero">
               <div>
                 {data.portal && <div className="ch-src">ŹRÓDŁO: {data.portal}</div>}
-                <div className="ch-brand">{data.brand ?? "NIEZNANA MARKA"}</div>
-                <div className="ch-model">{data.model ?? "NIEZNANY MODEL"}</div>
+                <div className="hero-line">
+                  <div className="ch-brand">{data.brand ?? "NIEZNANA MARKA"}</div>
+                  {comparisonLookup.brand && (
+                    <span
+                      className={`cmp-badge ${comparisonLookup.brand.status}`}
+                      title={checkTooltip(comparisonLookup.brand)}
+                    >
+                      {checkIcon(comparisonLookup.brand.status)}
+                    </span>
+                  )}
+                </div>
+                <div className="hero-line">
+                  <div className="ch-model">{data.model ?? "NIEZNANY MODEL"}</div>
+                  {comparisonLookup.model && (
+                    <span
+                      className={`cmp-badge ${comparisonLookup.model.status}`}
+                      title={checkTooltip(comparisonLookup.model)}
+                    >
+                      {checkIcon(comparisonLookup.model.status)}
+                    </span>
+                  )}
+                </div>
                 {data.variant && <div className="ch-variant">{data.variant}</div>}
               </div>
               {data.price && (
@@ -603,9 +1096,17 @@ export default function App() {
                 const val = f.fmt ? f.fmt(raw) : raw;
                 const unit = f.uFn ? f.uFn(data) : f.u;
                 const nil = val == null || val === "";
+                const check = comparisonLookup[f.key];
                 return (
-                  <div className="spec" key={f.key}>
-                    <div className="spec-lbl">{f.lbl}</div>
+                  <div className="spec" key={f.key} title={checkTooltip(check)}>
+                    <div className="spec-lbl-row">
+                      <div className="spec-lbl">{f.lbl}</div>
+                      {check && (
+                        <span className={`cmp-badge ${check.status}`}>
+                          {checkIcon(check.status)}
+                        </span>
+                      )}
+                    </div>
                     <div className={`spec-val${nil ? " nil" : ""}`}>
                       {nil ? "—" : <>{val}{unit && <span className="u">{unit}</span>}</>}
                     </div>
@@ -615,10 +1116,35 @@ export default function App() {
             </div>
 
             <div className="identity">
+              <div className="id-card">
+                <div className="id-ico">🪪</div>
+                <div style={{ width: "100%" }}>
+                  <div className="id-lbl">Numer rejestracyjny (ręcznie / z ogłoszenia)</div>
+                  <input
+                    className="id-input"
+                    placeholder="np. WX 12345"
+                    value={data.licensePlate ?? ""}
+                    onChange={e => setData(p => ({ ...p, licensePlate: e.target.value.toUpperCase().trim() || null }))}
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+              <div className="id-card">
+                <div className="id-ico">📅</div>
+                <div style={{ width: "100%" }}>
+                  <div className="id-lbl">Data pierwszej rejestracji (CEPiK)</div>
+                  <input
+                    className="id-input"
+                    placeholder="YYYY-MM-DD"
+                    value={data.firstRegistration ?? ""}
+                    onChange={e => setData(p => ({ ...p, firstRegistration: e.target.value.trim() || null }))}
+                    maxLength={32}
+                  />
+                </div>
+              </div>
               {[
-                { ico: "🪪", lbl: "Nr rejestracyjny", val: data.licensePlate },
-                { ico: "👤", lbl: "Sprzedający",      val: data.seller },
-                { ico: "📍", lbl: "Lokalizacja",      val: data.location },
+                { ico: "👤", lbl: "Sprzedający", val: data.seller },
+                { ico: "📍", lbl: "Lokalizacja", val: data.location },
               ].map(({ ico, lbl, val }) => (
                 <div className="id-card" key={lbl}>
                   <div className="id-ico">{ico}</div>
@@ -664,7 +1190,60 @@ export default function App() {
               <button className="act-btn primary" onClick={() => window.print()}>🖨 DRUKUJ / PDF</button>
               <button className="act-btn" onClick={dlJSON}>⬇ EKSPORTUJ JSON</button>
               <button className="act-btn" onClick={() => window.open(data.listingUrl, "_blank")}>↗ OGŁOSZENIE</button>
+              <button className="act-btn" disabled={!me || !data || saveBusy} onClick={saveSearch} title={!me ? "Wymagane logowanie" : ""}>
+                {saveBusy ? "…" : "💾 Zapisz w historii"}
+              </button>
+              <button
+                className="act-btn primary"
+                disabled={!canVerify || cepikLoading}
+                onClick={verifyGov}
+                title={!me ? "Zaloguj się" : !canVerify ? "Uzupełnij VIN, nr rej. i datę" : "Historia pojazdu (gov.pl)"}
+              >
+                {cepikLoading ? "…" : "✓ Weryfikuj dane z gov"}
+              </button>
             </div>
+            {saveMsg && <div className="note" style={{ marginTop: 8 }}>{saveMsg}{savedSearchId && <span className="meta-pill">ID {savedSearchId}</span>}</div>}
+            {cepikErr && (
+              <div className="err" style={{ marginTop: 12 }}>
+                <span className="err-ico">⚠</span>
+                <div><strong>CEPiK</strong> — {cepikErr}</div>
+              </div>
+            )}
+            {cepik && (
+              <div className="cepik-panel">
+                <div className="cepik-title">
+                  Weryfikacja moj.gov.pl
+                  {cepik.meta?.cacheHit != null && (
+                    <span className="meta-pill">{cepik.meta.cacheHit ? "cache hit" : "świeże dane"}</span>
+                  )}
+                </div>
+                {cepik.comparison?.checks?.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    {cepik.comparison.checks.map((c, i) => (
+                      <div className="check-row" key={i} title={c.message || ""}>
+                        <span className="check-ico">{c.status === "ok" ? "✓" : c.status === "warning" ? "!" : "○"}</span>
+                        <span className="check-field">{c.field}</span>
+                        <span className="check-msg">
+                          {c.message || `${JSON.stringify(c.listing)} → ${JSON.stringify(c.cepi)}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="desc-lbl" style={{ marginTop: 8 }}>Odczyty przebiegu (CEPiK)</div>
+                <pre style={{ fontSize: 11, marginTop: 6, whiteSpace: "pre-wrap", color: "var(--sub)" }}>
+                  {JSON.stringify(cepik.odometerReadings || [], null, 2)}
+                </pre>
+                <div className="desc-lbl" style={{ marginTop: 12 }}>Zdarzenia (timeline)</div>
+                <pre style={{ fontSize: 11, marginTop: 6, whiteSpace: "pre-wrap", color: "var(--sub)" }}>
+                  {JSON.stringify(cepik.events || [], null, 2)}
+                </pre>
+                <div className="desc-lbl" style={{ marginTop: 12 }}>Dane techniczne (znormalizowane)</div>
+                <pre style={{ fontSize: 11, marginTop: 6, whiteSpace: "pre-wrap", color: "var(--sub)" }}>
+                  {JSON.stringify(cepik.technicalData || {}, null, 2)}
+                </pre>
+              </div>
+            )}
 
             <div className="src-bar">
               <span>Źródło</span>
@@ -672,10 +1251,10 @@ export default function App() {
             </div>
 
             <div className="note">
-              <strong>ℹ Jak działa</strong> — Strona jest pobierana przez{" "}
-              <a href="https://r.jina.ai" target="_blank" rel="noreferrer" style={{color:"var(--amber)"}}>r.jina.ai</a>,
-              który konwertuje ją na Markdown omijając blokady CORS i anti-bot.
-              Parser odczytuje dane lokalnie — żadne dane nie trafiają do zewnętrznych serwerów.
+              <strong>ℹ Jak działa</strong> — Ogłoszenie jest pobierane przez{" "}
+              <a href="https://r.jina.ai" target="_blank" rel="noreferrer" style={{color:"var(--amber)"}}>r.jina.ai</a>{" "}
+              (Markdown, bez CORS). Parser działa w przeglądarce.{" "}
+              <strong>Weryfikacja gov</strong> idzie przez Twój backend FastAPI (konto + zapis historii), który odpytuje moj.gov.pl.
             </div>
 
             {data.__debug && (
