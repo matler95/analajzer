@@ -264,7 +264,7 @@ const toNum = v => {
 };
 
 const clean = v =>
-  v ? String(v).trim().replace(/\*+/g, "").replace(/\s+/g, " ").trim() || null : null;
+  v ? String(v).trim().replace(/!\[.*?\]\(.*?\)/g, "").replace(/\*+/g, "").replace(/\s+/g, " ").trim() || null : null;
 
 const cleanDate = v => {
   if (!v) return null;
@@ -412,20 +412,49 @@ function extractImages(md) {
 }
 
 function extractDescription(md) {
-  // Szuka bloku po nagłówku "Opis"
-  const m = md.match(
-    /(?:^|\n)#{1,3}\s*(?:Opis|Description)[^\n]*\n([\s\S]{20,1500}?)(?=\n#{1,3}|\n\*\*[A-ZŁŚŻŹĆÓ]|$)/i
-  );
-  if (m) return clean(m[1].replace(/\n{3,}/g, "\n\n"));
-  // Fallback: pierwszy długi blok tekstu który nie jest listą parametrów
+  const normalize = text => {
+    const cleaned = text
+      .replace(/\n{3,}/g, "\n\n")
+      .split("\n")
+      .filter(line => {
+        const trim = line.trim();
+        if (!trim) return false;
+        if (/!\[.*?\]\(.*?\)/i.test(trim)) return false;
+        if (/^\[.*?\]\(.*?\)$/i.test(trim)) return false;
+        if (/^\s*\[\s*\]\(.*?\)/.test(trim)) return false;
+        return true;
+      })
+      .join("\n");
+    return clean(cleaned);
+  };
+
+  // 1) Nagłówki Markdown: # Opis / ## Description
+  let m = md.match(/(?:^|\n)#{1,3}\s*(?:Opis|Description)[^\n]*\n([\s\S]*?)(?=\n#{1,3}|\n(?:Opis ogłoszenia|Opis|Description)|$)/i);
+  if (m) {
+    const desc = normalize(m[1]);
+    if (desc) return desc;
+  }
+
+  // 2) Wyrażenie opisowe bez nagłówka: Opis ogłoszenia / Opis / Description
+  m = md.match(/(?:^|\n)(?:Opis ogłoszenia|Opis|Description)\s*[:]?\s*\n([\s\S]*?)(?=\n#{1,3}|\n(?:Opis ogłoszenia|Opis|Description)|$)/i);
+  if (m) {
+    const desc = normalize(m[1]);
+    if (desc) return desc;
+  }
+
+  // 3) Fallback: pierwszy sensowny długi blok tekstu
   for (const block of md.split(/\n{2,}/)) {
     const t = block.trim();
     if (
-      t.length > 120 &&
+      t.length > 60 &&
       !/^[*#|]/.test(t) &&
       !/^\*\*(Marka|Model|Rok|Przebieg|Moc|Paliwo|Cena)/i.test(t)
-    ) return clean(t);
+    ) {
+      const fallback = normalize(t);
+      if (fallback) return fallback;
+    }
   }
+
   return null;
 }
 
