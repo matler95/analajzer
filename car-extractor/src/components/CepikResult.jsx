@@ -1,32 +1,72 @@
-function checkIcon(status) {
-  if (status === "ok") return "✓";
-  if (status === "warning") return "⚠";
-  return "○";
+function mismatchCountLabel(n) {
+  if (n === 1) return "pole niezgodne z CEPiK";
+  if (n >= 2 && n <= 4) return "pola niezgodne z CEPiK";
+  return "pól niezgodnych z CEPiK";
 }
 
 export default function CepikResult({ cepik }) {
   if (!cepik) return null;
 
   const checks = cepik.comparison?.checks || [];
+  const mismatches = checks.filter(c => c.status === "warning");
   const okCount = checks.filter(c => c.status === "ok").length;
-  const warnCount = checks.filter(c => c.status === "warning").length;
-  const total = checks.filter(c => c.status !== "check").length;
   const odo = cepik.odometerReadings || [];
+
+  const allComparedOk = mismatches.length === 0 && okCount > 0;
+  const noMismatchIncomplete =
+    mismatches.length === 0 && okCount === 0 && checks.length > 0;
 
   return (
     <div className="cepik-result">
       <div className="cepik-score-card">
-        <div>
-          <div className="cepik-score-num">{okCount}<span style={{ fontSize: "18px", color: "var(--sub)" }}>/{total}</span></div>
-          <div className="cepik-score-label">Pól zgodnych</div>
-        </div>
-        {warnCount > 0 && (
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--ff-m)", fontSize: 11, color: "var(--red)" }}>
-            ⚠ {warnCount} {warnCount === 1 ? "rozbieżność" : "rozbieżności"}
+        {mismatches.length > 0 ? (
+          <div>
+            <div className="cepik-score-num" style={{ color: "var(--red)" }}>
+              {mismatches.length}
+            </div>
+            <div className="cepik-score-label">{mismatchCountLabel(mismatches.length)}</div>
+          </div>
+        ) : allComparedOk ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 22, color: "var(--green)" }}>✓</span>
+            <div>
+              <div
+                className="cepik-score-label"
+                style={{
+                  fontSize: 12,
+                  color: "var(--text)",
+                  textTransform: "none",
+                  letterSpacing: "0",
+                }}
+              >
+                Wszystkie porównane pola są zgodne z CEPiK
+              </div>
+            </div>
+          </div>
+        ) : noMismatchIncomplete ? (
+          <div>
+            <div
+              className="cepik-score-label"
+              style={{
+                fontSize: 12,
+                color: "var(--sub)",
+                textTransform: "none",
+                letterSpacing: "0",
+              }}
+            >
+              Brak rozbieżności. Część pól nie została porównana (brak danych w ogłoszeniu lub w odpowiedzi CEPiK).
+            </div>
+          </div>
+        ) : (
+          <div
+            className="cepik-score-label"
+            style={{ fontSize: 11, color: "var(--sub)", textTransform: "none", letterSpacing: "0" }}
+          >
+            Porównanie z CEPiK
           </div>
         )}
         {cepik.meta?.cacheHit != null && (
-          <div className="meta-pill" style={{ marginLeft: warnCount > 0 ? 8 : "auto" }}>
+          <div className="meta-pill" style={{ marginLeft: "auto" }}>
             {cepik.meta.cacheHit ? "cache" : "świeże dane"}
           </div>
         )}
@@ -36,24 +76,36 @@ export default function CepikResult({ cepik }) {
         ⚠️ Dane z oficjalnego rejestru CEPiK (moj.gov.pl). Rozbieżności mogą wynikać z opóźnień aktualizacji lub błędów edycji.
       </div>
 
-      {checks.length > 0 && (
+      {mismatches.length > 0 && (
         <div className="cepik-checks">
-          <div className="cepik-check-row" style={{ background: "var(--card2)", fontFamily: "var(--ff-m)", fontSize: 9, letterSpacing: "1px", color: "var(--amber)", textTransform: "uppercase" }}>
+          <div
+            className="cepik-check-row"
+            style={{
+              background: "var(--card2)",
+              fontFamily: "var(--ff-m)",
+              fontSize: 9,
+              letterSpacing: "1px",
+              color: "var(--amber)",
+              textTransform: "uppercase",
+            }}
+          >
             <span></span>
             <span>Pole</span>
             <span>Ogłoszenie</span>
             <span>CEPiK</span>
           </div>
-          {checks.map((c, i) => (
-            <div key={i} className={`cepik-check-row ${c.status}`}>
-              <span className="cepik-check-icon" style={{ color: c.status === "ok" ? "var(--green)" : c.status === "warning" ? "var(--red)" : "var(--amber)" }}>
-                {checkIcon(c.status)}
+          {mismatches.map((c, i) => (
+            <div key={i} className="cepik-check-row warning">
+              <span className="cepik-check-icon" style={{ color: "var(--red)" }}>
+                ⚠
               </span>
               <span className="cepik-check-field">{c.field}</span>
               <span className="cepik-check-val">{c.listing != null ? String(c.listing) : "—"}</span>
               <span className="cepik-check-msg">
                 {c.cepi != null ? String(c.cepi) : ""}
-                {c.message && <span style={{ color: "var(--sub)", marginLeft: 4, fontSize: 9 }}>({c.message})</span>}
+                {c.message && (
+                  <span style={{ color: "var(--sub)", marginLeft: 4, fontSize: 9 }}>({c.message})</span>
+                )}
               </span>
             </div>
           ))}

@@ -1,6 +1,12 @@
 import { useState, useCallback } from "react";
 import { apiFetch } from "../api.js";
-import { normalizeLicensePlate, normalizeVin, normalizeDateForCepik, stripDebug } from "../utils/normalize.js";
+import {
+  normalizeLicensePlate,
+  normalizeVin,
+  normalizeDateForCepik,
+  isValidLicensePlate,
+  stripDebug,
+} from "../utils/normalize.js";
 
 export function useCepik({ me, data, savedSearchId, onVerified }) {
   const [cepikLoading, setCepikLoading] = useState(false);
@@ -25,6 +31,10 @@ export function useCepik({ me, data, savedSearchId, onVerified }) {
     const fr = normalizeDateForCepik(data.firstRegistration || "");
     if (!reg || !vin || !fr) {
       setCepikErr("Uzupełnij VIN, numer rejestracyjny i datę pierwszej rejestracji (YYYY-MM-DD).");
+      return;
+    }
+    if (!isValidLicensePlate(reg)) {
+      setCepikErr("Numer rejestracyjny wygląda na niepełny (połącz znaki w jeden ciąg; dopuszczalne 4–9 znaków, m.in. krótkie tablice).");
       return;
     }
     if (!me) {
@@ -60,7 +70,7 @@ export function useCepik({ me, data, savedSearchId, onVerified }) {
   const canVerify = Boolean(
     me &&
     data &&
-    (data.licensePlate || "").trim() &&
+    isValidLicensePlate(data.licensePlate || "") &&
     (data.vin || "").trim() &&
     normalizeDateForCepik(data.firstRegistration || "")
   );

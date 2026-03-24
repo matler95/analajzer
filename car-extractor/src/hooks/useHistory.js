@@ -1,6 +1,15 @@
 import { useState, useCallback } from "react";
 import { apiFetch } from "../api.js";
-import { mergeSearchRecord, normalizeDateForCepik, normalizeLicensePlate, normalizeVin, stripDebug, formatFastApiDetail } from "../utils/normalize.js";
+import {
+  mergeSearchRecord,
+  normalizeDateForCepik,
+  normalizeLicensePlate,
+  normalizeVin,
+  isValidLicensePlate,
+  isValidVin,
+  stripDebug,
+  formatFastApiDetail,
+} from "../utils/normalize.js";
 
 export function useHistory({ me }) {
   const [history, setHistory] = useState([]);
@@ -50,6 +59,17 @@ export function useHistory({ me }) {
     const vin = (row.manual_vin ?? snap.vin ?? "").toString().trim();
     const fr = normalizeDateForCepik(row.manual_first_registration ?? snap.firstRegistration ?? "");
     if (!reg || !vin || !fr) return;
+    if (!isValidLicensePlate(reg)) {
+      setUxNotice({
+        kind: "error",
+        msg: "Numer rejestracyjny nieprawidłowy (4–9 znaków po połączeniu w jeden ciąg, m.in. krótkie tablice).",
+      });
+      return;
+    }
+    if (!isValidVin(vin)) {
+      setUxNotice({ kind: "error", msg: "VIN musi mieć 17 poprawnych znaków." });
+      return;
+    }
 
     setHistVerifyBusy(b => ({ ...b, [row.id]: true }));
     try {

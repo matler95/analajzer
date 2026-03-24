@@ -6,16 +6,16 @@ import { buildExportPayload } from "../utils/normalize.js";
 const FIELDS = [
   { key: "year",               lbl: "Rok" },
   { key: "mileage",            lbl: "Przebieg",    u: "km",  fmt: v => v?.toLocaleString("pl-PL") },
-  { key: "firstRegistration",  lbl: "Pierwsza rej." },
+  { key: "countryOfOrigin",    lbl: "Kraj pochodzenia" },
   { key: "engineDisplacement", lbl: "Pojemność",   u: "cm³", fmt: v => v?.toLocaleString("pl-PL") },
   { key: "enginePower",        lbl: "Moc",         uFn: d => d.enginePowerUnit || "KM" },
   { key: "fuelType",           lbl: "Paliwo" },
   { key: "transmission",       lbl: "Skrzynia" },
   { key: "drivetrain",         lbl: "Napęd" },
   { key: "bodyType",           lbl: "Nadwozie" },
-  { key: "color",              lbl: "Kolor" },
-  { key: "doors",              lbl: "Drzwi" },
-  { key: "seats",              lbl: "Miejsca" },
+  // { key: "color",              lbl: "Kolor" },
+  // { key: "doors",              lbl: "Drzwi" },
+  // { key: "seats",              lbl: "Miejsca" },
 ];
 
 const COMPARISON_TO_UI = {
@@ -183,10 +183,8 @@ export default function ResultCard({
   const verificationBadge = cepik ? (() => {
     const checks = cepik.comparison?.checks || [];
     const warns = checks.filter(c => c.status === "warning").length;
-    const oks = checks.filter(c => c.status === "ok").length;
-    const total = checks.filter(c => c.status !== "check").length;
     if (warns > 0) return { cls: "red", label: `⚠ ${warns} rozbieżn.` };
-    return { cls: "green", label: `✓ ${oks}/${total} OK` };
+    return { cls: "green", label: "✓ Zgodne z CEPiK" };
   })() : null;
 
   return (

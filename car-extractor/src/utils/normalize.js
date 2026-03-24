@@ -51,9 +51,13 @@ export function normalizeLicensePlate(input) {
   return s.replace(/[\s-]+/g, "");
 }
 
+/**
+ * Polskie numery rejestracyjne (CEPiK / moj.gov.pl), w tym tablice zmniejszone („krótkie”)
+ * — po normalizacji bez spacji/myślników dopuszczamy 4–9 znaków alfanumerycznych.
+ */
 export function isValidLicensePlate(input) {
   const s = normalizeLicensePlate(input);
-  return /^[A-Z0-9]{5,8}$/.test(s);
+  return /^[A-Z0-9]{4,9}$/.test(s);
 }
 
 export function normListingUrl(u) {

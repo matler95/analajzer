@@ -3,6 +3,8 @@
  * from markdown output.
  */
 
+import { normalizeVin, isValidVin } from "./normalize.js";
+
 /* ─── FETCH ──────────────────────────────────────────────── */
 
 export function detectPortal(url) {
@@ -244,6 +246,88 @@ function extractDescription(md) {
   return null;
 }
 
+/** VIN must use letters (not only digits); excludes many numeric IDs. */
+function isLikelyVinFrame(s) {
+  return isValidVin(s) && /[A-HJ-NPR-Z]/.test(s);
+}
+
+function stripVinLabelPrefix(raw) {
+  if (!raw) return "";
+  return String(raw)
+    .replace(/^(?:numer\s*)?vin\s*[:\-–]?\s*/i, "")
+    .replace(/^\*+\s*/, "")
+    .trim();
+}
+
+function extractVinByScanning(text) {
+  const re = /\b([A-HJ-NPR-Z0-9]{17})\b/gi;
+  const candidates = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const cand = normalizeVin(m[1]);
+    if (!isLikelyVinFrame(cand)) continue;
+    if (/^GTM/i.test(cand)) continue;
+    candidates.push({ cand, index: m.index });
+  }
+  if (!candidates.length) return null;
+  const uniq = [...new Set(candidates.map(c => c.cand))];
+  if (uniq.length === 1) return uniq[0];
+  const anchor = text.toLowerCase().search(/\bvin\b/);
+  if (anchor < 0) return candidates[0].cand;
+  let best = candidates[0].cand;
+  let bestDist = Infinity;
+  for (const { cand, index } of candidates) {
+    const d = Math.abs(index - anchor);
+    if (d < bestDist) {
+      bestDist = d;
+      best = cand;
+    }
+  }
+  return best;
+}
+
+function extractVinFromOlxUrl(urlStr) {
+  if (!urlStr || !/olx\.pl/i.test(urlStr)) return null;
+  try {
+    const raw = String(urlStr).trim();
+    const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, "")}`;
+    const u = new URL(href);
+    for (const [key, val] of u.searchParams.entries()) {
+      if (!/^vin$/i.test(key)) continue;
+      const v = normalizeVin(val);
+      if (isLikelyVinFrame(v)) return v;
+    }
+    const blob = `${decodeURIComponent(u.pathname)}${u.search}${u.hash}`;
+    return extractVinByScanning(blob);
+  } catch {
+    return null;
+  }
+}
+
+function resolveVin(md, kv, url) {
+  const vinKv = fromKv(kv, "Numer VIN", "Numer vin", "VIN", "Vin");
+  const vinField = field(
+    md,
+    "Numer VIN",
+    "Numer vin",
+    "VIN",
+    "Vin number",
+    "Vehicle Identification Number",
+  );
+  const raw = clean(vinKv ?? vinField);
+  if (raw) {
+    const v = normalizeVin(stripVinLabelPrefix(raw));
+    if (isLikelyVinFrame(v)) return v;
+  }
+  if (/olx\.pl/i.test(url)) {
+    const fromBody = extractVinByScanning(md);
+    if (fromBody) return fromBody;
+    const fromLink = extractVinFromOlxUrl(url);
+    if (fromLink) return fromLink;
+  }
+  return null;
+}
+
 function extractLocationFromMarkdown(md) {
   const text = String(md ?? "");
   const patterns = [
@@ -306,6 +390,22 @@ export function parseMd(md, url) {
   })();
   const firstRegistrationKv = fromKv(kv, "Data pierwszej rejestracji w historii pojazdu", "Data pierwszej rejestracji", "Pierwsza rejestracja");
   const firstRegistrationField = field(md, "Data pierwszej rejestracji w historii pojazdu", "Data pierwszej rejestracji", "Pierwsza rejestracja");
+  const countryOfOriginKv = fromKv(
+    kv,
+    "Kraj pochodzenia",
+    "Kraj pierwszej rejestracji",
+    "Miejsce pierwszej rejestracji",
+    "Pochodzenie",
+    "Country of origin",
+  );
+  const countryOfOriginField = field(
+    md,
+    "Kraj pochodzenia",
+    "Kraj pierwszej rejestracji",
+    "Miejsce pierwszej rejestracji",
+    "Pochodzenie",
+    "Country of origin",
+  );
 
   return {
     brand, model, variant,
@@ -329,8 +429,9 @@ export function parseMd(md, url) {
     doors:        fieldNum(fromKv(kv, "Liczba drzwi", "Drzwi", "Doors")) ?? fieldNum(md, "Liczba drzwi", "Drzwi", "Doors"),
     seats:        fieldNum(fromKv(kv, "Liczba miejsc", "Miejsca", "Seats")) ?? fieldNum(md, "Liczba miejsc", "Miejsca", "Seats"),
     firstRegistration: cleanDate(firstRegistrationKv ?? firstRegistrationField),
+    countryOfOrigin: clean(countryOfOriginKv ?? countryOfOriginField),
     licensePlate: licensePlateKv ?? licensePlateField,
-    vin: null,
+    vin: resolveVin(md, kv, url),
     location: locationKv ?? locationField ?? locationMap,
     seller: sellerKv ?? sellerField ?? sellerSection,
     description: extractDescription(md),

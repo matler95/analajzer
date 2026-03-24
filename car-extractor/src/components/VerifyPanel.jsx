@@ -19,10 +19,14 @@ export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLo
   const missingItems = [];
   if (!me) missingItems.push("logowanie");
   if (!plate.trim()) missingItems.push("numer rej.");
+  else if (!isValidLicensePlate(plate)) missingItems.push("numer rej. (4–9 zn., krótkie tablice)");
   if (!vin.trim()) missingItems.push("VIN");
+  else if (!isValidVin(vin)) missingItems.push("VIN (17 znaków)");
   if (!normalizeDateForCepik(firstReg)) missingItems.push("data rej.");
 
-  const canVerify = me && plate.trim() && vin.trim() && normalizeDateForCepik(firstReg);
+  const plateNorm = normalizeLicensePlate(plate);
+  const canVerify =
+    me && isValidLicensePlate(plate) && isValidVin(vin) && normalizeDateForCepik(firstReg);
   const stepsDone = getStepCount(data);
 
   const handlePlatePaste = (e) => {
@@ -59,11 +63,16 @@ export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLo
             id="verify-plate"
             className={`verify-input ${plate ? "has-value" : ""}`}
             value={plate}
-            placeholder="np. WX12345"
+            placeholder="np. WX12345, krótka tablica 4–9 zn."
             maxLength={12}
             onChange={e => onUpdateField("licensePlate", e.target.value)}
             onPaste={handlePlatePaste}
           />
+          {plate.trim() && (
+            <div className={`validation-msg ${isValidLicensePlate(plate) ? "valid" : "invalid"}`}>
+              {plateNorm.length} zn. (4–9, bez spacji) {isValidLicensePlate(plate) ? "✓" : "✗"}
+            </div>
+          )}
         </div>
 
         <div className="verify-field">

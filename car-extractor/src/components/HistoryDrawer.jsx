@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { normalizeLicensePlate, normalizeVin, normalizeDateForCepik } from "../utils/normalize.js";
+import {
+  normalizeLicensePlate,
+  normalizeVin,
+  normalizeDateForCepik,
+  isValidLicensePlate,
+  isValidVin,
+} from "../utils/normalize.js";
 
 function getValidationStatus(key, draft) {
   const raw = String(draft ?? "").trim();
@@ -12,8 +18,11 @@ function getValidationStatus(key, draft) {
   }
   if (key === "licensePlate") {
     const s = normalizeLicensePlate(raw);
-    const ok = /^[A-Z0-9]{5,8}$/.test(s);
-    return { status: ok ? "valid" : "invalid", msg: ok ? `"${s}" ✓` : "✗ 5-8 znaków" };
+    const ok = isValidLicensePlate(s);
+    return {
+      status: ok ? "valid" : "invalid",
+      msg: ok ? `"${s}" ✓` : "✗ 4–9 znaków (m.in. krótkie tablice)",
+    };
   }
   if (key === "firstRegistration") {
     const ok = /^\d{4}-\d{2}-\d{2}$/.test(raw);
@@ -163,7 +172,12 @@ export default function HistoryDrawer({
             const effVin = h.manual_vin ?? snap.vin ?? null;
             const effFirstReg = h.manual_first_registration ?? snap.firstRegistration ?? null;
             const canRowVerify = Boolean(
-              me && effPlate && effVin && normalizeDateForCepik(effFirstReg || "")
+              me &&
+                effPlate &&
+                effVin &&
+                normalizeDateForCepik(effFirstReg || "") &&
+                isValidLicensePlate(effPlate) &&
+                isValidVin(effVin),
             );
 
             return (
