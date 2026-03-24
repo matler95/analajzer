@@ -70,6 +70,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .id-val.nil{color:var(--muted);font-weight:400;font-size:12px;letter-spacing:.5px}
 .id-input{width:100%;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--ff-m);font-size:14px;letter-spacing:1px;padding:8px 10px;outline:none}
 .id-input:focus{border-color:var(--amber);box-shadow:0 0 0 2px var(--amber-glow)}
+.id-input[type="date"]{color-scheme:dark}
 .desc-box{margin-top:1px;background:var(--card);border:1px solid var(--border2);padding:16px 18px}
 .desc-lbl{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
 .desc-txt{color:var(--text);font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow-y:auto}
@@ -101,13 +102,50 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-u);-webkit-font
 .auth-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;padding:12px 14px;border:1px solid var(--border2);border-radius:4px;background:var(--card)}
 .auth-row input{background:var(--card2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--ff-m);font-size:12px;min-width:140px}
 .auth-row .mini{font-family:var(--ff-m);font-size:10px;color:var(--sub)}
-.history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.hist-card{border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);cursor:pointer;text-align:left;transition:border-color .15s}
-.hist-card:hover{border-color:var(--amber)}
-.hist-card img{width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--card2)}
-.hist-body{padding:10px 12px}
-.hist-title{font-family:var(--ff-d);font-size:16px;letter-spacing:1px}
-.hist-meta{font-family:var(--ff-m);font-size:9px;color:var(--sub);margin-top:4px}
+.history-list{display:flex;flex-direction:column;gap:10px}
+.hist-row{position:relative;display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:stretch;border:1px solid var(--border2);border-radius:4px;overflow:hidden;background:var(--card);cursor:pointer;transition:border-color .15s}
+.hist-row:hover{border-color:var(--amber)}
+.hist-thumb{width:120px;aspect-ratio:16/10;object-fit:cover;background:var(--card2)}
+.hist-main{padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.hist-title{font-family:var(--ff-d);font-size:24px;letter-spacing:1.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.hist-meta{font-family:var(--ff-m);font-size:9px;color:var(--sub)}
+.hist-sub{font-family:var(--ff-m);font-size:11px;color:var(--text);opacity:.9}
+.hist-sub .dim{color:var(--sub)}
+.hist-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hist-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-family:var(--ff-m);font-size:9px;letter-spacing:.3px;border:1px solid var(--border2);background:var(--card2);color:var(--sub)}
+.hist-badge.ok{border-color:#3d5d47;background:#2a2f2a;color:#b5f4c8}
+.hist-badge.warn{border-color:#7f5b2f;background:#3a2c1f;color:#ffd18c}
+.hist-badge.check{border-color:#f0a50066;background:#f0a5001a;color:var(--amber)}
+.hist-actions{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-left:1px solid var(--border)}
+.hist-actions .act-mini{border:1px solid var(--border2);background:var(--card2);color:var(--sub);border-radius:8px;padding:8px 10px;cursor:pointer;font-family:var(--ff-m);font-size:11px;text-align:center}
+.hist-actions .act-mini:hover{border-color:var(--amber);color:var(--text)}
+.hist-actions .act-mini.primary{background:var(--amber-bg);color:var(--amber)}
+.hist-actions .act-mini.primary:hover{background:var(--amber);color:#000}
+.hist-actions .act-mini.danger{background:#e0454510;color:#ffb0b0}
+.hist-actions .act-mini.danger:hover{background:#4a1f1f;border-color:#e04545}
+.hist-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hist-field{border:1px solid transparent;border-radius:8px;padding:8px 10px;background:transparent;min-width:0;transition:background .15s,border-color .15s}
+.hist-field:hover{background:var(--card2);border-color:var(--border2)}
+.hist-field:focus-within{background:var(--card2);border-color:var(--amber);box-shadow:0 0 0 2px var(--amber-glow)}
+.hist-field .k{font-family:var(--ff-m);font-size:9px;color:var(--sub);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hist-field .v{margin-top:6px;font-family:var(--ff-m);font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-field .v.nil{color:var(--muted)}
+.hist-field input{width:100%;margin-top:6px}
+.hist-field .edit-actions{margin-top:8px}
+.hist-tap{margin-top:6px;width:100%;text-align:left;border:none;background:transparent;color:inherit;padding:0;cursor:text}
+.hist-tap:focus{outline:none}
+.hist-row-note{font-family:var(--ff-m);font-size:10px;color:var(--sub)}
+@media(max-width:680px){
+  .hist-row{grid-template-columns:90px 1fr;grid-template-rows:auto auto}
+  .hist-thumb{width:90px}
+  .hist-actions{grid-column:1 / -1;flex-direction:row;flex-wrap:wrap}
+  .hist-fields{grid-template-columns:1fr}
+}
+.edit-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.edit-actions{display:flex;gap:6px}
+.edit-btn{border:1px solid var(--border2);background:var(--card2);color:var(--sub);border-radius:6px;padding:4px 8px;cursor:pointer;font-family:var(--ff-m);font-size:11px}
+.edit-btn:hover{color:var(--text);border-color:var(--amber)}
+.edit-err{margin-top:8px;font-family:var(--ff-m);font-size:10px;color:var(--red);line-height:1.4}
 .cepik-panel{margin-top:16px;border:1px solid var(--border2);border-radius:4px;background:var(--card);padding:16px 18px}
 .cepik-title{font-family:var(--ff-m);font-size:10px;color:var(--amber);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
 .check-row{display:flex;align-items:flex-start;gap:10px;font-family:var(--ff-m);font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)}
@@ -616,6 +654,39 @@ function mergeSearchRecord(row) {
   };
 }
 
+function normListingUrl(u) {
+  return String(u || "").trim().replace(/\/+$/, "");
+}
+
+function normalizeLicensePlate(input) {
+  const s = String(input || "")
+    .toUpperCase()
+    .replace(/\u00a0/g, " ")
+    .trim();
+  // usuń spacje i łączniki z wklejonej wartości
+  return s.replace(/[\s-]+/g, "");
+}
+
+function isValidLicensePlate(input) {
+  const s = normalizeLicensePlate(input);
+  // dość liberalnie: PL tablice zwykle 5-8 znaków, litery+cyfry
+  return /^[A-Z0-9]{5,8}$/.test(s);
+}
+
+function normalizeVin(input) {
+  return String(input || "")
+    .toUpperCase()
+    .replace(/\u00a0/g, " ")
+    .trim()
+    .replace(/\s+/g, "");
+}
+
+function isValidVin(input) {
+  const s = normalizeVin(input);
+  // VIN: 17 znaków, bez I/O/Q
+  return /^[A-HJ-NPR-Z0-9]{17}$/.test(s);
+}
+
 /** FastAPI: detail bywa stringiem, tablicą {loc,msg,type} albo obiektem — zawsze na czytelny string pod React. */
 function formatFastApiDetail(detail) {
   if (detail == null || detail === "") return "";
@@ -722,6 +793,13 @@ export default function App() {
   const [cepik, setCepik] = useState(null);
   const [cepikLoading, setCepikLoading] = useState(false);
   const [cepikErr, setCepikErr] = useState(null);
+  const [editMode, setEditMode] = useState({ licensePlate: false, firstRegistration: false, vin: false });
+  const [editDraft, setEditDraft] = useState({ licensePlate: "", firstRegistration: "", vin: "" });
+  const [editErr, setEditErr] = useState({ licensePlate: null, firstRegistration: null, vin: null });
+  const [histEditMode, setHistEditMode] = useState({});
+  const [histEditDraft, setHistEditDraft] = useState({});
+  const [histEditErr, setHistEditErr] = useState({});
+  const [histVerifyBusy, setHistVerifyBusy] = useState({});
 
   useEffect(() => {
     const el = document.createElement("style");
@@ -773,9 +851,31 @@ export default function App() {
     setCepikErr(null);
     setSaveMsg(null);
     try {
+      const normU = normListingUrl(u);
+      if (me) {
+        const existingRes = await apiFetch(`/searches/lookup/by-url?listing_url=${encodeURIComponent(normU)}`);
+        if (existingRes.ok) {
+          const existing = await existingRes.json();
+          if (existing) {
+            setData(mergeSearchRecord(existing));
+            setSavedSearchId(existing.id);
+            if (existing.latest_verification?.normalized) {
+              setCepik({
+                technicalData: existing.latest_verification.normalized.technicalData || {},
+                odometerReadings: existing.latest_verification.normalized.odometerReadings || [],
+                events: existing.latest_verification.normalized.events || [],
+                meta: { fromHistory: true, cacheHit: existing.latest_verification.cache_hit },
+                comparison: existing.latest_verification.comparison || null,
+              });
+            }
+            setSaveMsg("Wczytano z historii (bez ponownego fetch).");
+            return;
+          }
+        }
+      }
       const md = await fetchPage(u);
       const car = parseMd(md, u);
-      car.listingUrl = u;
+      car.listingUrl = normU;
       setData(car);
     } catch (e) {
       setError(e.message ?? "Nieznany błąd");
@@ -843,6 +943,137 @@ export default function App() {
     setTab("analyze");
   };
 
+  const startEdit = key => {
+    if (!data) return;
+    let seed = String(data[key] ?? "");
+    if (key === "licensePlate") seed = normalizeLicensePlate(seed);
+    if (key === "vin") seed = normalizeVin(seed);
+    if (key === "firstRegistration") seed = normalizeDateForCepik(seed);
+    setEditDraft(d => ({ ...d, [key]: seed }));
+    setEditErr(e => ({ ...e, [key]: null }));
+    setEditMode(m => ({ ...m, [key]: true }));
+  };
+
+  const cancelEdit = key => {
+    setEditErr(e => ({ ...e, [key]: null }));
+    setEditMode(m => ({ ...m, [key]: false }));
+  };
+
+  const confirmEdit = key => {
+    const raw = String(editDraft[key] ?? "").trim();
+    let val = raw || null;
+    if (key === "vin") val = normalizeVin(raw) || null;
+    if (key === "licensePlate") val = normalizeLicensePlate(raw) || null;
+    if (key === "firstRegistration") val = normalizeDateForCepik(raw) || null;
+
+    if (key === "vin" && val && !isValidVin(val)) {
+      setEditErr(e => ({ ...e, vin: "Niepoprawny VIN (wymagane 17 znaków, bez I/O/Q)." }));
+      return;
+    }
+    if (key === "licensePlate" && val && !isValidLicensePlate(val)) {
+      setEditErr(e => ({ ...e, licensePlate: "Niepoprawny numer rejestracyjny (oczekiwane 5–8 znaków A-Z/0-9)." }));
+      return;
+    }
+    if (key === "firstRegistration" && val && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      setEditErr(e => ({ ...e, firstRegistration: "Niepoprawny format daty. Użyj kalendarza lub YYYY-MM-DD." }));
+      return;
+    }
+
+    setData(p => ({ ...p, [key]: val }));
+    setEditMode(m => ({ ...m, [key]: false }));
+    setEditErr(e => ({ ...e, [key]: null }));
+  };
+
+  const deleteHistoryItem = async id => {
+    const ok = window.confirm("Usunąć to ogłoszenie z historii?");
+    if (!ok) return;
+    const res = await apiFetch(`/searches/${id}`, { method: "DELETE" });
+    if (!res.ok) return;
+    setHistory(prev => prev.filter(h => h.id !== id));
+    if (savedSearchId === id) {
+      setSavedSearchId(null);
+      setData(null);
+      setCepik(null);
+      setCepikErr(null);
+    }
+  };
+
+  const histStartEdit = (id, key, currentValue) => {
+    setHistEditDraft(d => {
+      const row = d[id] || {};
+      let seed = String(currentValue ?? "");
+      if (key === "manual_license_plate") seed = normalizeLicensePlate(seed);
+      if (key === "manual_vin") seed = normalizeVin(seed);
+      if (key === "manual_first_registration") seed = normalizeDateForCepik(seed);
+      return { ...d, [id]: { ...row, [key]: seed } };
+    });
+    setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: null } }));
+    setHistEditMode(m => ({ ...m, [id]: { ...(m[id] || {}), [key]: true } }));
+  };
+
+  const histCancelEdit = (id, key) => {
+    setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: null } }));
+    setHistEditMode(m => ({ ...m, [id]: { ...(m[id] || {}), [key]: false } }));
+  };
+
+  const histConfirmEdit = async (id, key) => {
+    const draft = histEditDraft[id] || {};
+    const raw = String(draft[key] ?? "").trim();
+    let val = raw || null;
+    if (key === "manual_vin") val = normalizeVin(raw) || null;
+    if (key === "manual_license_plate") val = normalizeLicensePlate(raw) || null;
+    if (key === "manual_first_registration") val = normalizeDateForCepik(raw) || null;
+
+    if (key === "manual_vin" && val && !isValidVin(val)) {
+      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: "Niepoprawny VIN (17 znaków, bez I/O/Q)." } }));
+      return;
+    }
+    if (key === "manual_license_plate" && val && !isValidLicensePlate(val)) {
+      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: "Niepoprawny numer rejestracyjny (5–8 znaków A-Z/0-9)." } }));
+      return;
+    }
+    if (key === "manual_first_registration" && val && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      setHistEditErr(e => ({ ...e, [id]: { ...(e[id] || {}), [key]: "Niepoprawny format daty. Użyj kalendarza." } }));
+      return;
+    }
+
+    const res = await apiFetch(`/searches/${id}`, {
+      method: "PATCH",
+      body: { [key]: val },
+    });
+    if (!res.ok) return;
+    await loadHistory();
+    setHistEditMode(m => ({ ...m, [id]: { ...(m[id] || {}), [key]: false } }));
+  };
+
+  const verifyHistoryItem = async (row) => {
+    if (!me) return;
+    const snap = row.snapshot_json || {};
+    const reg = (row.manual_license_plate ?? snap.licensePlate ?? "").toString().trim();
+    const vin = (row.manual_vin ?? snap.vin ?? "").toString().trim();
+    const fr = normalizeDateForCepik(row.manual_first_registration ?? snap.firstRegistration ?? "");
+    if (!reg || !vin || !fr) return;
+
+    setHistVerifyBusy(b => ({ ...b, [row.id]: true }));
+    try {
+      const res = await apiFetch("/cepik/verify", {
+        method: "POST",
+        body: {
+          search_id: row.id,
+          registration_number: normalizeLicensePlate(reg),
+          vin_number: normalizeVin(vin),
+          first_registration_date: fr,
+          listing_snapshot: stripDebug(mergeSearchRecord(row)),
+          force_refresh: false,
+        },
+      });
+      if (!res.ok) return;
+      await loadHistory();
+    } finally {
+      setHistVerifyBusy(b => ({ ...b, [row.id]: false }));
+    }
+  };
+
   const persistManualToServer = async id => {
     if (!id || !me) return;
     await apiFetch(`/searches/${id}`, {
@@ -863,11 +1094,20 @@ export default function App() {
       const res = await apiFetch("/searches", {
         method: "POST",
         body: {
-          listing_url: data.listingUrl,
+          listing_url: normListingUrl(data.listingUrl),
           snapshot_json: stripDebug(data),
           manual_vin: data.vin || null,
           manual_first_registration: data.firstRegistration || null,
           manual_license_plate: data.licensePlate || null,
+          latest_verification: cepik
+            ? {
+                technicalData: cepik.technicalData || {},
+                odometerReadings: cepik.odometerReadings || [],
+                events: cepik.events || [],
+                comparison: cepik.comparison || null,
+                meta: cepik.meta || {},
+              }
+            : null,
         },
       });
       const j = await res.json().catch(() => ({}));
@@ -876,7 +1116,7 @@ export default function App() {
         return;
       }
       setSavedSearchId(j.id);
-      setSaveMsg("Zapisano w historii.");
+      setSaveMsg("Zapisano/zaaktualizowano w historii.");
       loadHistory();
     } finally {
       setSaveBusy(false);
@@ -991,19 +1231,139 @@ export default function App() {
             {!me && <div className="note">Zaloguj się, aby zobaczyć historię.</div>}
             {me && !histLoading && history.length === 0 && <div className="note">Brak zapisanych wyszukiwań.</div>}
             {me && (
-              <div className="history-grid">
+              <div className="history-list">
                 {history.map(h => {
                   const snap = h.snapshot_json || {};
                   const img = snap.images?.[0];
                   const title = [snap.brand, snap.model, snap.year].filter(Boolean).join(" ") || "Pojazd";
+                  const ver = h.verification;
+                  const subtitleParts = [];
+                  if (snap.engineDisplacement) subtitleParts.push(`${Number(snap.engineDisplacement).toLocaleString("pl-PL")} cm³`);
+                  if (snap.enginePower) subtitleParts.push(`${Number(snap.enginePower).toLocaleString("pl-PL")} KM`);
+                  if (snap.mileage) subtitleParts.push(`${Number(snap.mileage).toLocaleString("pl-PL")} km`);
+                  const subtitle = subtitleParts.join(" · ");
+                  const effPlate = h.manual_license_plate ?? snap.licensePlate ?? null;
+                  const effVin = h.manual_vin ?? snap.vin ?? null;
+                  const effFirstReg = h.manual_first_registration ?? snap.firstRegistration ?? null;
+                  const canRowVerify = Boolean(me && effPlate && effVin && normalizeDateForCepik(effFirstReg || ""));
+                  const rowMode = histEditMode[h.id] || {};
+                  const rowDraft = histEditDraft[h.id] || {};
+                  const rowErr = histEditErr[h.id] || {};
                   return (
-                    <button type="button" key={h.id} className="hist-card" onClick={() => openHistoryItem(h.id)}>
-                      {img ? <img src={img} alt="" /> : <div style={{ aspectRatio: "16/10", background: "var(--card2)" }} />}
-                      <div className="hist-body">
+                    <div key={h.id} className="hist-row" onClick={() => openHistoryItem(h.id)}>
+                      {img ? <img className="hist-thumb" src={img} alt="" /> : <div className="hist-thumb" />}
+                      <div className="hist-main">
                         <div className="hist-title">{title}</div>
-                        <div className="hist-meta">{new Date(h.created_at).toLocaleString("pl-PL")}</div>
+                        {subtitle && <div className="hist-sub">{subtitle}</div>}
+                        <div className="hist-meta">{new Date(h.created_at).toLocaleString("pl-PL")} · {snap.portal || "źródło"}</div>
+                        <div className="hist-badges">
+                          {ver?.status === "ok" && <div className="hist-badge ok">✓ Zweryfikowane</div>}
+                          {ver?.status === "warning" && <div className="hist-badge warn">! Weryfikacja: uwagi</div>}
+                          {ver?.status === "check" && <div className="hist-badge check">○ Weryfikacja: częściowa</div>}
+                        </div>
+
+                        <div className="hist-fields" onClick={e => e.stopPropagation()}>
+                          <div className="hist-field">
+                            <div className="k">Tablice</div>
+                            {rowMode.manual_license_plate ? (
+                              <>
+                                <input
+                                  className="id-input"
+                                  value={rowDraft.manual_license_plate ?? ""}
+                                  placeholder="np. WX12345"
+                                  onChange={e => setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_license_plate: e.target.value } }))}
+                                  onPaste={e => {
+                                    const pasted = e.clipboardData?.getData("text") ?? "";
+                                    if (pasted) {
+                                      e.preventDefault();
+                                      setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_license_plate: normalizeLicensePlate(pasted) } }));
+                                    }
+                                  }}
+                                />
+                                <div className="edit-actions">
+                                  <button type="button" className="edit-btn" onClick={() => histConfirmEdit(h.id, "manual_license_plate")}>Zapisz</button>
+                                  <button type="button" className="edit-btn" onClick={() => histCancelEdit(h.id, "manual_license_plate")}>Anuluj</button>
+                                </div>
+                                {rowErr.manual_license_plate && <div className="edit-err">{rowErr.manual_license_plate}</div>}
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`hist-tap v${!effPlate ? " nil" : ""}`}
+                                onClick={() => histStartEdit(h.id, "manual_license_plate", effPlate)}
+                                title="Kliknij aby edytować"
+                              >
+                                {effPlate ? normalizeLicensePlate(effPlate) : "brak"}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="hist-field">
+                            <div className="k">VIN</div>
+                            {rowMode.manual_vin ? (
+                              <>
+                                <input className="id-input" value={rowDraft.manual_vin ?? ""} placeholder="17 znaków" onChange={e => setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_vin: e.target.value } }))} maxLength={17} />
+                                <div className="edit-actions">
+                                  <button type="button" className="edit-btn" onClick={() => histConfirmEdit(h.id, "manual_vin")}>Zapisz</button>
+                                  <button type="button" className="edit-btn" onClick={() => histCancelEdit(h.id, "manual_vin")}>Anuluj</button>
+                                </div>
+                                {rowErr.manual_vin && <div className="edit-err">{rowErr.manual_vin}</div>}
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`hist-tap v${!effVin ? " nil" : ""}`}
+                                onClick={() => histStartEdit(h.id, "manual_vin", effVin)}
+                                title="Kliknij aby edytować"
+                              >
+                                {effVin ? normalizeVin(effVin) : "brak"}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="hist-field">
+                            <div className="k">1. rej.</div>
+                            {rowMode.manual_first_registration ? (
+                              <>
+                                <input
+                                  type="date"
+                                  lang="pl-PL"
+                                  className="id-input"
+                                  value={rowDraft.manual_first_registration ?? ""}
+                                  onChange={e => setHistEditDraft(d => ({ ...d, [h.id]: { ...(d[h.id] || {}), manual_first_registration: e.target.value } }))}
+                                />
+                                <div className="edit-actions">
+                                  <button type="button" className="edit-btn" onClick={() => histConfirmEdit(h.id, "manual_first_registration")}>Zapisz</button>
+                                  <button type="button" className="edit-btn" onClick={() => histCancelEdit(h.id, "manual_first_registration")}>Anuluj</button>
+                                </div>
+                                {rowErr.manual_first_registration && <div className="edit-err">{rowErr.manual_first_registration}</div>}
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`hist-tap v${!effFirstReg ? " nil" : ""}`}
+                                onClick={() => histStartEdit(h.id, "manual_first_registration", effFirstReg)}
+                                title="Kliknij aby edytować"
+                              >
+                                {effFirstReg ? normalizeDateForCepik(effFirstReg) : "brak"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {!canRowVerify && (
+                          <div className="hist-row-note">Uzupełnij VIN/tablice/datę, aby weryfikować z gov.</div>
+                        )}
                       </div>
-                    </button>
+
+                      <div className="hist-actions" onClick={e => e.stopPropagation()}>
+                        <button type="button" className="act-mini primary" disabled={!canRowVerify || histVerifyBusy[h.id]} onClick={() => verifyHistoryItem(h)}>
+                          {histVerifyBusy[h.id] ? "…" : "Zweryfikuj"}
+                        </button>
+                        <button type="button" className="act-mini" onClick={() => openHistoryItem(h.id)}>Otwórz</button>
+                        <button type="button" className="act-mini danger" onClick={() => deleteHistoryItem(h.id)}>Usuń</button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -1097,19 +1457,47 @@ export default function App() {
                 const unit = f.uFn ? f.uFn(data) : f.u;
                 const nil = val == null || val === "";
                 const check = comparisonLookup[f.key];
+                const isEditableFirstReg = f.key === "firstRegistration";
                 return (
                   <div className="spec" key={f.key} title={checkTooltip(check)}>
                     <div className="spec-lbl-row">
                       <div className="spec-lbl">{f.lbl}</div>
+                      {isEditableFirstReg && !editMode.firstRegistration && (
+                        <button
+                          type="button"
+                          className="edit-btn"
+                          title="Edytuj datę"
+                          onClick={() => startEdit("firstRegistration")}
+                        >
+                          ✎
+                        </button>
+                      )}
                       {check && (
                         <span className={`cmp-badge ${check.status}`}>
                           {checkIcon(check.status)}
                         </span>
                       )}
                     </div>
-                    <div className={`spec-val${nil ? " nil" : ""}`}>
-                      {nil ? "—" : <>{val}{unit && <span className="u">{unit}</span>}</>}
-                    </div>
+                    {isEditableFirstReg && editMode.firstRegistration ? (
+                      <>
+                        <input
+                          type="date"
+                          className="id-input"
+                          lang="pl-PL"
+                          value={editDraft.firstRegistration}
+                          onChange={e => setEditDraft(d => ({ ...d, firstRegistration: e.target.value }))}
+                        />
+                        <div className="edit-actions" style={{ marginTop: 8 }}>
+                          <button type="button" className="edit-btn" onClick={() => confirmEdit("firstRegistration")}>Zapisz</button>
+                          <button type="button" className="edit-btn" onClick={() => cancelEdit("firstRegistration")}>Anuluj</button>
+                        </div>
+                        {editErr.firstRegistration && <div className="edit-err">{editErr.firstRegistration}</div>}
+                      </>
+                    ) : (
+                      <div className={`spec-val${nil ? " nil" : ""}`}>
+                        {nil ? "—" : <>{val}{unit && <span className="u">{unit}</span>}</>}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1119,27 +1507,35 @@ export default function App() {
               <div className="id-card">
                 <div className="id-ico">🪪</div>
                 <div style={{ width: "100%" }}>
-                  <div className="id-lbl">Numer rejestracyjny (ręcznie / z ogłoszenia)</div>
-                  <input
-                    className="id-input"
-                    placeholder="np. WX 12345"
-                    value={data.licensePlate ?? ""}
-                    onChange={e => setData(p => ({ ...p, licensePlate: e.target.value.toUpperCase().trim() || null }))}
-                    maxLength={20}
-                  />
-                </div>
-              </div>
-              <div className="id-card">
-                <div className="id-ico">📅</div>
-                <div style={{ width: "100%" }}>
-                  <div className="id-lbl">Data pierwszej rejestracji (CEPiK)</div>
-                  <input
-                    className="id-input"
-                    placeholder="YYYY-MM-DD"
-                    value={data.firstRegistration ?? ""}
-                    onChange={e => setData(p => ({ ...p, firstRegistration: e.target.value.trim() || null }))}
-                    maxLength={32}
-                  />
+                  <div className="edit-row">
+                    <div className="id-lbl">Numer rejestracyjny (ręcznie / z ogłoszenia)</div>
+                    {!editMode.licensePlate && <button type="button" className="edit-btn" onClick={() => startEdit("licensePlate")}>✎</button>}
+                  </div>
+                  {editMode.licensePlate ? (
+                    <>
+                      <input
+                        className="id-input"
+                        placeholder="np. WX 12345"
+                        value={editDraft.licensePlate}
+                        onChange={e => setEditDraft(d => ({ ...d, licensePlate: e.target.value }))}
+                        onPaste={e => {
+                          const pasted = e.clipboardData?.getData("text") ?? "";
+                          if (pasted) {
+                            e.preventDefault();
+                            setEditDraft(d => ({ ...d, licensePlate: normalizeLicensePlate(pasted) }));
+                          }
+                        }}
+                        maxLength={20}
+                      />
+                      <div className="edit-actions" style={{ marginTop: 8 }}>
+                        <button type="button" className="edit-btn" onClick={() => confirmEdit("licensePlate")}>Zapisz</button>
+                        <button type="button" className="edit-btn" onClick={() => cancelEdit("licensePlate")}>Anuluj</button>
+                      </div>
+                      {editErr.licensePlate && <div className="edit-err">{editErr.licensePlate}</div>}
+                    </>
+                  ) : (
+                    <div className={`id-val${!data.licensePlate ? " nil" : ""}`}>{data.licensePlate ?? "Niedostępne"}</div>
+                  )}
                 </div>
               </div>
               {[
@@ -1157,14 +1553,28 @@ export default function App() {
               <div className="id-card">
                 <div className="id-ico">🔑</div>
                 <div style={{ width: "100%" }}>
-                  <div className="id-lbl">Numer VIN (ręcznie)</div>
-                  <input
-                    className="id-input"
-                    placeholder="Wpisz VIN ręcznie"
-                    value={data.vin ?? ""}
-                    onChange={e => setData(p => ({ ...p, vin: e.target.value.toUpperCase().trim() || null }))}
-                    maxLength={17}
-                  />
+                  <div className="edit-row">
+                    <div className="id-lbl">Numer VIN (ręcznie)</div>
+                    {!editMode.vin && <button type="button" className="edit-btn" onClick={() => startEdit("vin")}>✎</button>}
+                  </div>
+                  {editMode.vin ? (
+                    <>
+                      <input
+                        className="id-input"
+                        placeholder="Wpisz VIN ręcznie"
+                        value={editDraft.vin}
+                        onChange={e => setEditDraft(d => ({ ...d, vin: e.target.value }))}
+                        maxLength={17}
+                      />
+                      <div className="edit-actions" style={{ marginTop: 8 }}>
+                        <button type="button" className="edit-btn" onClick={() => confirmEdit("vin")}>Zapisz</button>
+                        <button type="button" className="edit-btn" onClick={() => cancelEdit("vin")}>Anuluj</button>
+                      </div>
+                      {editErr.vin && <div className="edit-err">{editErr.vin}</div>}
+                    </>
+                  ) : (
+                    <div className={`id-val${!data.vin ? " nil" : ""}`}>{data.vin ?? "Niedostępne"}</div>
+                  )}
                 </div>
               </div>
             </div>

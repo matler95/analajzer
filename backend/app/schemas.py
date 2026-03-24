@@ -45,6 +45,7 @@ class SearchCreate(BaseModel):
     manual_vin: str | None = None
     manual_first_registration: str | None = None
     manual_license_plate: str | None = None
+    latest_verification: dict[str, Any] | None = None
 
 
 class SearchOut(BaseModel):
@@ -58,6 +59,18 @@ class SearchOut(BaseModel):
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+class SearchVerificationSummary(BaseModel):
+    status: str
+    ok_count: int = 0
+    warning_count: int = 0
+    check_count: int = 0
+    created_at: datetime | None = None
+
+
+class SearchHistoryOut(SearchOut):
+    verification: SearchVerificationSummary | None = None
 
 
 class SearchDetailOut(SearchOut):
