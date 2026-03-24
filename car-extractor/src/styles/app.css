@@ -1456,3 +1456,441 @@ body {
   .spec-lbl, .id-lbl, .ch-src, .price-note { color: #888 !important; }
   .specs, .identity { background: #ddd !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   HERO V2 — full-bleed image with overlaid content
+   Replace .car-hero usage in ResultCard with .car-hero-v2
+   ═══════════════════════════════════════════════════════════ */
+
+.car-hero-v2 {
+  position: relative;
+  border: 1px solid var(--border2);
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+}
+
+/* Full-bleed image container */
+.car-hero-img-wrap {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  overflow: hidden;
+  background: var(--card2);
+}
+
+@media (max-width: 680px) {
+  .car-hero-img-wrap { height: 220px; }
+}
+
+.car-hero-img-full {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .4s ease;
+}
+
+.car-hero-img-wrap:hover .car-hero-img-full {
+  transform: scale(1.02);
+}
+
+.car-hero-img-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--card2) 0%, #0e0e1a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vx-logo {
+  font-family: var(--ff-d);
+  font-size: 72px;
+  color: var(--border2);
+  letter-spacing: 6px;
+}
+
+/* Gradient overlay — bottom-heavy for text legibility */
+.car-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,.05) 0%,
+    rgba(0,0,0,.0) 25%,
+    rgba(0,0,0,.55) 70%,
+    rgba(0,0,0,.88) 100%
+  );
+  pointer-events: none;
+}
+
+/* Overlay content positioned over the image */
+.car-hero-overlay-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 20px 18px;
+  pointer-events: none;
+}
+
+.car-hero-top-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: all;
+}
+
+.car-hero-portal-badge {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 3px 9px;
+  border-radius: 2px;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.7);
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+}
+
+.car-hero-score-badge {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  padding: 3px 10px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.car-hero-score-badge.green {
+  background: rgba(61, 184, 122, .25);
+  border: 1px solid rgba(61, 184, 122, .5);
+  color: #7fffbe;
+}
+
+.car-hero-score-badge.yellow {
+  background: rgba(240, 165, 0, .25);
+  border: 1px solid rgba(240, 165, 0, .5);
+  color: #ffd18c;
+}
+
+.car-hero-score-badge.red {
+  background: rgba(224, 69, 69, .25);
+  border: 1px solid rgba(224, 69, 69, .5);
+  color: #ffb0b0;
+}
+
+.car-hero-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: all;
+}
+
+.car-hero-title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.car-hero-brand {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.6);
+  margin-bottom: 2px;
+}
+
+.car-hero-model {
+  font-family: var(--ff-d);
+  font-size: 52px;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: .5px;
+  text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 680px) {
+  .car-hero-model { font-size: 36px; }
+}
+
+.car-hero-price-block {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.car-hero-price-val {
+  font-family: var(--ff-d);
+  font-size: 42px;
+  line-height: 1;
+  color: var(--amber);
+  text-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+
+.car-hero-price-cur {
+  font-size: 16px;
+  margin-right: 2px;
+  opacity: .8;
+}
+
+.car-hero-price-note {
+  font-family: var(--ff-m);
+  font-size: 8px;
+  color: rgba(255,255,255,.45);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-align: right;
+  margin-top: 3px;
+}
+
+@media (max-width: 680px) {
+  .car-hero-price-val { font-size: 30px; }
+  .car-hero-bottom-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .car-hero-price-block { text-align: left; }
+  .car-hero-price-note { text-align: left; }
+}
+
+/* Thumbnail strip */
+.car-hero-thumbstrip {
+  display: flex;
+  gap: 2px;
+  background: var(--card2);
+  padding: 4px;
+  border-top: 1px solid var(--border2);
+}
+
+.car-hero-thumb {
+  width: 72px;
+  height: 48px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border2);
+  border-radius: 2px;
+  cursor: pointer;
+  background: var(--card);
+  transition: border-color .15s, opacity .15s;
+  padding: 0;
+}
+
+.car-hero-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.car-hero-thumb:hover { border-color: var(--amber); opacity: .9; }
+
+.car-hero-thumb-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-m);
+  font-size: 11px;
+  color: var(--sub);
+}
+
+.car-hero-thumb-more:hover { color: var(--amber); }
+
+/* Variant bar */
+.car-variant-bar {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-top: none;
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--sub);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GALLERY V2 — clickable grid with zoom indicator
+   ═══════════════════════════════════════════════════════════ */
+
+.gallery-v2 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  background: var(--border);
+  border: 1px solid var(--border2);
+  border-top: none;
+}
+
+@media (max-width: 680px) {
+  .gallery-v2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.gallery-v2-item {
+  position: relative;
+  display: block;
+  background: var(--card);
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  cursor: zoom-in;
+}
+
+.gallery-v2-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .25s ease;
+}
+
+.gallery-v2-item:hover img { transform: scale(1.04); }
+
+.gallery-v2-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  background: rgba(0,0,0,.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: rgba(255,255,255,.85);
+  opacity: 0;
+  transform: scale(.8);
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+}
+
+.gallery-v2-item:hover .gallery-v2-zoom {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHTBOX
+   ═══════════════════════════════════════════════════════════ */
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.92);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn .2s ease;
+  outline: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.lightbox-inner {
+  position: relative;
+  max-width: 92vw;
+  max-height: 92vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-img {
+  max-width: 92vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 2px;
+  display: block;
+  box-shadow: 0 8px 60px rgba(0,0,0,.7);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: -44px;
+  right: 0;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  z-index: 501;
+}
+
+.lightbox-close:hover { background: rgba(255,255,255,.2); }
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  z-index: 501;
+  line-height: 1;
+}
+
+.lightbox-nav:hover { background: rgba(255,255,255,.25); }
+
+.lightbox-prev { left: -64px; }
+.lightbox-next { right: -64px; }
+
+@media (max-width: 680px) {
+  .lightbox-prev { left: -44px; width: 38px; height: 38px; font-size: 24px; }
+  .lightbox-next { right: -44px; width: 38px; height: 38px; font-size: 24px; }
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: -38px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: rgba(255,255,255,.5);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HISTORY DRAWER — add "check" badge variant
+   ═══════════════════════════════════════════════════════════ */
+
+.hist-badge.check {
+  border-color: #5a4d1f;
+  background: #2e2a16;
+  color: #f0d070;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SKELETON V2 — update to match new hero height
+   ═══════════════════════════════════════════════════════════ */
+
+.skeleton-hero-img { height: 320px; }
+
+@media (max-width: 680px) {
+  .skeleton-hero-img { height: 220px; }
+}

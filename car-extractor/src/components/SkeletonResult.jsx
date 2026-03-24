@@ -1,30 +1,25 @@
 /**
- * SkeletonResult — pulsing placeholder that mirrors the shape of ResultCard.
- * Rendered while fetchPage() is in flight so users see the layout before data arrives.
+ * SkeletonResult — pulsing placeholder that mirrors the shape of ResultCard with hero v2.
  */
 export default function SkeletonResult() {
   return (
     <div className="skeleton-result" aria-busy="true" aria-label="Ładowanie ogłoszenia…">
 
-      {/* Hero */}
-      <div className="skeleton-hero">
-        <div className="skeleton skeleton-hero-img" />
-        <div className="skeleton-hero-body">
-          <div className="skeleton-hero-info">
-            {/* source label */}
-            <div className="skeleton" style={{ width: 80, height: 9 }} />
-            {/* brand */}
-            <div className="skeleton" style={{ width: 120, height: 14 }} />
-            {/* model */}
-            <div className="skeleton" style={{ width: 220, height: 42, marginTop: 2 }} />
-            {/* variant */}
-            <div className="skeleton" style={{ width: 140, height: 11, marginTop: 2 }} />
-          </div>
-          <div className="skeleton-hero-price">
-            <div className="skeleton" style={{ width: 160, height: 40 }} />
-            <div className="skeleton" style={{ width: 80, height: 9, marginTop: 4 }} />
-          </div>
-        </div>
+      {/* Hero v2 — full-bleed image area */}
+      <div className="skeleton skeleton-hero-img" style={{ borderRadius: "4px 4px 0 0", border: "1px solid var(--border2)" }} />
+
+      {/* Thumbnail strip */}
+      <div style={{
+        display: "flex",
+        gap: 2,
+        padding: 4,
+        background: "var(--card2)",
+        border: "1px solid var(--border2)",
+        borderTop: "none",
+      }}>
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="skeleton" style={{ width: 72, height: 48, flexShrink: 0, borderRadius: 2 }} />
+        ))}
       </div>
 
       {/* Tabs */}

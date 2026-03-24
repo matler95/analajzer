@@ -49,6 +49,118 @@ function checkTooltip(check) {
   return `Ogłoszenie: ${left} | CEPiK: ${right}`;
 }
 
+/* ─── LIGHTBOX ─────────────────────────────────────────── */
+function Lightbox({ images, initialIndex, onClose }) {
+  const [idx, setIdx] = useState(initialIndex);
+  const prev = () => setIdx(i => (i - 1 + images.length) % images.length);
+  const next = () => setIdx(i => (i + 1) % images.length);
+
+  const handleKey = (e) => {
+    if (e.key === "ArrowLeft") prev();
+    if (e.key === "ArrowRight") next();
+    if (e.key === "Escape") onClose();
+  };
+
+  return (
+    <div className="lightbox-overlay" onClick={onClose} onKeyDown={handleKey} tabIndex={0} role="dialog" aria-label="Przeglądarka zdjęć">
+      <div className="lightbox-inner" onClick={e => e.stopPropagation()}>
+        <button type="button" className="lightbox-close" onClick={onClose} aria-label="Zamknij">✕</button>
+        <img src={images[idx]} alt={`Zdjęcie ${idx + 1}`} className="lightbox-img" />
+        {images.length > 1 && (
+          <>
+            <button type="button" className="lightbox-nav lightbox-prev" onClick={prev} aria-label="Poprzednie">‹</button>
+            <button type="button" className="lightbox-nav lightbox-next" onClick={next} aria-label="Następne">›</button>
+            <div className="lightbox-counter">{idx + 1} / {images.length}</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── HERO IMAGE ────────────────────────────────────────── */
+function HeroImage({ images, verificationBadge, brand, model, price, currency, portal }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const mainImage = images?.[0];
+
+  return (
+    <>
+      <div className="car-hero-v2">
+        {/* Full-bleed image */}
+        <div className="car-hero-img-wrap" onClick={mainImage ? () => setLightboxOpen(true) : undefined}
+             style={{ cursor: mainImage ? "zoom-in" : "default" }}>
+          {mainImage
+            ? <img src={mainImage} alt="Zdjęcie pojazdu" className="car-hero-img-full" />
+            : <div className="car-hero-img-placeholder"><span className="vx-logo">VX</span></div>
+          }
+          {/* Gradient overlay for text legibility */}
+          <div className="car-hero-overlay" />
+        </div>
+
+        {/* Overlaid content */}
+        <div className="car-hero-overlay-content">
+          {/* Top row: portal badge + verification score */}
+          <div className="car-hero-top-row">
+            {portal && (
+              <div className="car-hero-portal-badge">{portal.toUpperCase()}</div>
+            )}
+            {verificationBadge && (
+              <div className={`car-hero-score-badge ${verificationBadge.cls}`}>
+                {verificationBadge.label}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom row: brand/model/price */}
+          <div className="car-hero-bottom-row">
+            <div className="car-hero-title-block">
+              <div className="car-hero-brand">{brand ?? "Nieznana marka"}</div>
+              <div className="car-hero-model">{model ?? "Nieznany model"}</div>
+            </div>
+            {price && (
+              <div className="car-hero-price-block">
+                <div className="car-hero-price-val">
+                  <span className="car-hero-price-cur">{currency ?? "PLN"}</span>
+                  {price.toLocaleString("pl-PL")}
+                </div>
+                <div className="car-hero-price-note">CENA BRUTTO</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Thumbnail strip if multiple images */}
+        {images?.length > 1 && (
+          <div className="car-hero-thumbstrip">
+            {images.slice(0, 6).map((img, i) => (
+              <button
+                key={i}
+                type="button"
+                className="car-hero-thumb"
+                onClick={() => setLightboxOpen(true)}
+                aria-label={`Zdjęcie ${i + 1}`}
+              >
+                <img src={img} alt="" />
+              </button>
+            ))}
+            {images.length > 6 && (
+              <button type="button" className="car-hero-thumb car-hero-thumb-more"
+                onClick={() => setLightboxOpen(true)}>
+                +{images.length - 6}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {lightboxOpen && (
+        <Lightbox images={images} initialIndex={0} onClose={() => setLightboxOpen(false)} />
+      )}
+    </>
+  );
+}
+
+/* ─── MAIN COMPONENT ────────────────────────────────────── */
 export default function ResultCard({
   data, cepik, savedSearchId, saveMsg, saveBusy,
   me, cepikLoading, cepikErr,
@@ -56,6 +168,7 @@ export default function ResultCard({
 }) {
   const [activeTab, setActiveTab] = useState("specs");
   const [showDebug, setShowDebug] = useState(false);
+  const [galleryLightbox, setGalleryLightbox] = useState(null); // index or null
   const compLookup = buildComparisonLookup(cepik);
 
   const dlJSON = () => {
@@ -70,53 +183,30 @@ export default function ResultCard({
   const verificationBadge = cepik ? (() => {
     const checks = cepik.comparison?.checks || [];
     const warns = checks.filter(c => c.status === "warning").length;
-    if (warns > 0) return { cls: "red", label: `⚠ ${warns} rozbieżności` };
-    return { cls: "green", label: "✓ Zweryfikowane" };
+    const oks = checks.filter(c => c.status === "ok").length;
+    const total = checks.filter(c => c.status !== "check").length;
+    if (warns > 0) return { cls: "red", label: `⚠ ${warns} rozbieżn.` };
+    return { cls: "green", label: `✓ ${oks}/${total} OK` };
   })() : null;
 
   return (
     <div className="result">
-      {/* ─── HERO ─── */}
-      <div className="car-hero">
-        {data.images?.[0]
-          ? <img src={data.images[0]} alt="Zdjęcie ogłoszenia" className="car-hero-image" />
-          : <div className="car-hero-image-placeholder">VX</div>
-        }
-        <div className="car-hero-content">
-          <div className="car-hero-info">
-            {data.portal && <div className="ch-src">ŹRÓDŁO: {data.portal}</div>}
-            <div className="ch-brand-row">
-              <div className="ch-brand">{data.brand ?? "NIEZNANA MARKA"}</div>
-              {compLookup.brand && (
-                <span className={`cmp-badge ${compLookup.brand.status}`} title={checkTooltip(compLookup.brand)}>
-                  {checkIcon(compLookup.brand.status)}
-                </span>
-              )}
-            </div>
-            <div className="ch-model-row">
-              <div className="ch-model">{data.model ?? "NIEZNANY MODEL"}</div>
-              {compLookup.model && (
-                <span className={`cmp-badge ${compLookup.model.status}`} title={checkTooltip(compLookup.model)}>
-                  {checkIcon(compLookup.model.status)}
-                </span>
-              )}
-            </div>
-            {data.variant && <div className="ch-variant">{data.variant}</div>}
-            {verificationBadge && (
-              <div className={`verification-badge ${verificationBadge.cls}`}>{verificationBadge.label}</div>
-            )}
-          </div>
-          {data.price && (
-            <div className="car-hero-price">
-              <div className="price-val">
-                <span className="price-cur">{data.currency ?? "PLN"}</span>
-                {data.price.toLocaleString("pl-PL")}
-              </div>
-              <div className="price-note">CENA BRUTTO</div>
-            </div>
-          )}
-        </div>
-      </div>
+
+      {/* ─── HERO V2 ─── */}
+      <HeroImage
+        images={data.images}
+        verificationBadge={verificationBadge}
+        brand={data.brand}
+        model={data.model}
+        price={data.price}
+        currency={data.currency}
+        portal={data.portal}
+      />
+
+      {/* Variant subtitle below hero if present */}
+      {data.variant && (
+        <div className="car-variant-bar">{data.variant}</div>
+      )}
 
       {/* ─── TABS ─── */}
       <div className="result-tabs">
@@ -169,7 +259,6 @@ export default function ResultCard({
             })}
           </div>
 
-          {/* Verify Panel */}
           <VerifyPanel
             me={me}
             data={data}
@@ -180,7 +269,6 @@ export default function ResultCard({
             cepik={cepik}
           />
 
-          {/* CEPiK Result */}
           {cepik && <CepikResult cepik={cepik} />}
         </div>
       )}
@@ -189,13 +277,29 @@ export default function ResultCard({
       {activeTab === "photos" && (
         <div className="result-tab-content">
           {data.images?.length > 0 ? (
-            <div className="gallery">
-              {data.images.map((img, i) => (
-                <a className="gallery-item" key={i} href={img} target="_blank" rel="noreferrer">
-                  <img src={img} alt={`Zdjęcie ${i + 1}`} loading="lazy" />
-                </a>
-              ))}
-            </div>
+            <>
+              <div className="gallery-v2">
+                {data.images.map((img, i) => (
+                  <button
+                    type="button"
+                    key={i}
+                    className="gallery-v2-item"
+                    onClick={() => setGalleryLightbox(i)}
+                    aria-label={`Otwórz zdjęcie ${i + 1}`}
+                  >
+                    <img src={img} alt={`Zdjęcie ${i + 1}`} loading="lazy" />
+                    <div className="gallery-v2-zoom">⤢</div>
+                  </button>
+                ))}
+              </div>
+              {galleryLightbox !== null && (
+                <Lightbox
+                  images={data.images}
+                  initialIndex={galleryLightbox}
+                  onClose={() => setGalleryLightbox(null)}
+                />
+              )}
+            </>
           ) : (
             <div className="note" style={{ borderRadius: 0 }}>Brak zdjęć w ogłoszeniu.</div>
           )}
@@ -247,7 +351,6 @@ export default function ResultCard({
 
       {/* ─── ACTION BAR ─── */}
       <div className="action-bar">
-        {/* Secondary actions — left cluster */}
         <div className="action-bar-secondary">
           <button type="button" className="act-btn" onClick={() => window.open(data.listingUrl, "_blank")} title="Otwórz ogłoszenie">
             ↗ Ogłoszenie
@@ -262,7 +365,6 @@ export default function ResultCard({
 
         <div className="action-bar-spacer" />
 
-        {/* Status label */}
         {saveMsg && (
           <div className="action-bar-status">
             <div className="action-bar-status-text">
@@ -272,7 +374,6 @@ export default function ResultCard({
           </div>
         )}
 
-        {/* Primary save CTA — rightmost */}
         <button
           type="button"
           className="act-btn-save"
@@ -292,7 +393,7 @@ export default function ResultCard({
       <div className="note">
         <strong>ℹ Jak działa</strong> — Pobieranie przez{" "}
         <a href="https://r.jina.ai" target="_blank" rel="noreferrer" style={{ color: "var(--amber)" }}>r.jina.ai</a>.{" "}
-        Weryfikacja gov idzie przez backend FastAPI → moj.gov.pl.
+        Weryfikacja CEPiK przez backend FastAPI → moj.gov.pl.
       </div>
 
       {data.__debug && (

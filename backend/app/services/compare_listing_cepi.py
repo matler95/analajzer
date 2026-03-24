@@ -197,8 +197,8 @@ def compare_listing_to_cepi(
         latest_odo = _mileage_from_reading(odometer_readings[-1])
 
     if listing_mileage is not None and latest_odo is not None:
-        diff = abs(listing_mileage - latest_odo)
-        if diff <= tolerance_km:
+        min_allowed = latest_odo - tolerance_km
+        if listing_mileage >= min_allowed:
             add_check(
                 "mileage",
                 "ok",
