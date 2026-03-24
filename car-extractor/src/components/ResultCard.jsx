@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import VerifyPanel from "./VerifyPanel.jsx";
 import CepikResult from "./CepikResult.jsx";
 import { buildExportPayload } from "../utils/normalize.js";
@@ -170,6 +170,14 @@ export default function ResultCard({
   const [showDebug, setShowDebug] = useState(false);
   const [galleryLightbox, setGalleryLightbox] = useState(null); // index or null
   const compLookup = buildComparisonLookup(cepik);
+  const hasCepik = Boolean(cepik);
+
+  const cepikTabDisabledTitle =
+    "Najpierw przeprowadź weryfikację przyciskiem „Weryfikuj z gov.pl” w zakładce Specyfikacja.";
+
+  useEffect(() => {
+    if (activeTab === "cepik" && !hasCepik) setActiveTab("specs");
+  }, [activeTab, hasCepik]);
 
   const dlJSON = () => {
     const name = [data.brand, data.model, data.year].filter(Boolean).join("-");
@@ -209,19 +217,27 @@ export default function ResultCard({
       {/* ─── TABS ─── */}
       <div className="result-tabs">
         {[
-          { key: "specs", label: "Specyfikacja" },
-          { key: "photos", label: `Zdjęcia${data.images?.length ? ` (${data.images.length})` : ""}` },
-          { key: "desc", label: "Opis" },
-          { key: "seller", label: "Sprzedający" },
+          { key: "specs", label: "Specyfikacja", disabled: false },
+          { key: "photos", label: `Zdjęcia${data.images?.length ? ` (${data.images.length})` : ""}`, disabled: false },
+          { key: "desc", label: "Opis", disabled: false },
+          { key: "seller", label: "Sprzedający", disabled: false },
+          { key: "cepik", label: "CEPiK", disabled: !hasCepik },
         ].map(tab => (
-          <button
+          <div
             key={tab.key}
-            type="button"
-            className={`result-tab ${activeTab === tab.key ? "on" : ""}`}
-            onClick={() => setActiveTab(tab.key)}
+            className={`result-tab-cell ${tab.disabled ? "is-disabled" : ""}`}
+            title={tab.disabled ? cepikTabDisabledTitle : undefined}
           >
-            {tab.label}
-          </button>
+            <button
+              type="button"
+              className={`result-tab ${activeTab === tab.key ? "on" : ""}`}
+              onClick={() => !tab.disabled && setActiveTab(tab.key)}
+              disabled={tab.disabled}
+              aria-disabled={tab.disabled}
+            >
+              {tab.label}
+            </button>
+          </div>
         ))}
       </div>
 
@@ -264,10 +280,14 @@ export default function ResultCard({
             onVerify={onVerify}
             cepikLoading={cepikLoading}
             cepikErr={cepikErr}
-            cepik={cepik}
           />
+        </div>
+      )}
 
-          {cepik && <CepikResult cepik={cepik} />}
+      {/* ─── CEPIK TAB (po weryfikacji) ─── */}
+      {activeTab === "cepik" && hasCepik && (
+        <div className="result-tab-content">
+          <CepikResult cepik={cepik} />
         </div>
       )}
 

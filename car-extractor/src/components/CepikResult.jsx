@@ -1,3 +1,5 @@
+import OdometerChart from "./OdometerChart.jsx";
+
 function mismatchCountLabel(n) {
   if (n === 1) return "pole niezgodne z CEPiK";
   if (n >= 2 && n <= 4) return "pola niezgodne z CEPiK";
@@ -72,9 +74,6 @@ export default function CepikResult({ cepik }) {
         )}
       </div>
 
-      <div className="cepik-disclaimer">
-        ⚠️ Dane z oficjalnego rejestru CEPiK (moj.gov.pl). Rozbieżności mogą wynikać z opóźnień aktualizacji lub błędów edycji.
-      </div>
 
       {mismatches.length > 0 && (
         <div className="cepik-checks">
@@ -115,20 +114,7 @@ export default function CepikResult({ cepik }) {
       {odo.length > 0 && (
         <>
           <div className="cepik-section-title">Historia przebiegu</div>
-          <div className="odo-timeline">
-            {[...odo].reverse().map((r, i) => (
-              <div key={i} className="odo-row">
-                <span className="odo-date">{r.date || r.checkDate || "—"}</span>
-                <span className="odo-val">
-                  {r.mileage != null
-                    ? Number(r.mileage).toLocaleString("pl-PL") + " km"
-                    : r.value != null
-                      ? Number(r.value).toLocaleString("pl-PL") + " km"
-                      : "—"}
-                </span>
-              </div>
-            ))}
-          </div>
+          <OdometerChart readings={odo} />
         </>
       )}
 
@@ -140,13 +126,34 @@ export default function CepikResult({ cepik }) {
               <div key={i} className="odo-row">
                 <span className="odo-date">{ev.date || "—"}</span>
                 <span className="odo-val" style={{ fontSize: 11, color: "var(--sub)", fontWeight: 400 }}>
-                  {ev.type || ev.description || "Zdarzenie"}
+                  {ev.raw?.eventName || ev.type || ev.description || "Zdarzenie"}
                 </span>
               </div>
             ))}
           </div>
         </>
       )}
+
+      {cepik.events?.length > 0 && (
+        <>
+          <div className="cepik-section-title">Dodatkowe informacje</div>
+          <div className="odo-timeline">
+            {cepik.events.slice(0, 8).map((ev, i) => (
+              <div key={i} className="odo-row">
+                <span className="odo-date">{ev.date || "—"}</span>
+                <span className="odo-val" style={{ fontSize: 11, color: "var(--sub)", fontWeight: 400 }}>
+                  {ev.raw?.eventName || ev.type || ev.description || "Zdarzenie"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="cepik-disclaimer">
+        ⚠️ Dane z oficjalnego rejestru CEPiK (moj.gov.pl). Rozbieżności mogą wynikać z opóźnień aktualizacji lub błędów edycji.
+      </div>
+
     </div>
   );
 }

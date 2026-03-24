@@ -9,7 +9,7 @@ function getStepCount(data) {
   return done;
 }
 
-export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLoading, cepikErr, cepik }) {
+export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLoading, cepikErr }) {
   const [pasteMsg, setPasteMsg] = useState(null);
 
   const plate = data?.licensePlate || "";

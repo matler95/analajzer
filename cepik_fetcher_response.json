@@ -1,0 +1,491 @@
+(venv) PS C:\Users\Mateusz\Desktop\historia-pojazdu-new\historia-pojazdu-master\src> python .\cepik_fetcher.py
+=== HistoriaPojazdu Fetcher ===
+Nr rejestracyjny: WGR47000 
+VIN: WBALM71070E298782
+Data pierwszej rejestracji (YYYY-MM-DD): 2009-06-26
+
+=== WYCIĄGNIĘTE PRZEBIEGI ===
+PRZEBIEG: 54096 km | odometerNumber: FIRST
+
+=== PEŁNE DANE POJAZDU ===
+{
+  "technicalData": {
+    "basicData": {
+      "registrationStatus": "Zarejestrowany",
+      "technicalInspectionStatus": "aktualne",
+      "hasCurrentOCPolicy": true,
+      "vehicleLost": false,
+      "vehicleTemporarilyWithdrawn": false,
+      "make": "BMW",
+      "model": "Z4 SDRIVE 35I",
+      "type": "SAMOCHÓD OSOBOWY",
+      "subtype": "KABRIOLET",
+      "purpose": null,
+      "identifyingFeature": "WBALM71070E298782",
+      "yearOfManufacture": 2009,
+      "odometerReadings": [
+        {
+          "value": 54096,
+          "unit": "km",
+          "odometerNumber": "FIRST",
+          "error": false,
+          "errorMessage": null,
+          "rolledBack": false
+        }
+      ]
+    },
+    "detailedData": {
+      "engineCapacity": 2979,
+      "maxNetEnginePower": 225,
+      "euroEmissionLevel": "EURO 4",
+      "fuelType": "benzyna",
+      "avgCO2Emission": null,
+      "avgFuelConsumption": 9,
+      "altFuelType": null,
+      "altFuelAvgCO2Emission": null,
+      "altFuelAvgFuelConsumption": null,
+      "secondAltFuelType": null,
+      "secondAltFuelAvgCO2Emission": null,
+      "secondAltFuelAvgFuelConsumption": null,
+      "totalNumberOfSeats": 2,
+      "numberOfSeats": 2,
+      "numberOfStandingPlaces": null,
+      "curbWeight": 1525,
+      "permissibleTotalPayload": null,
+      "permissibleGrossWeight": 1855,
+      "maxBrakedTrailerWeight": null,
+      "maxUnbrakedTrailerWeight": null,
+      "numberOfAxles": 2,
+      "wheelbase": null,
+      "maxAxleLoad": null,
+      "homologationCertificateNumber": "e1*2001/116*0499*00",
+      "homologationCategory": "M1",
+      "homologationVersion": "5B",
+      "homologationVariant": "LM71",
+      "homologationType": "Z89",
+      "vehicleDocumentType": "Dowód rejestracyjny",
+      "vehicleDocumentIssueDate": "2022-08-03",
+      "vehicleDocumentConditionMarking": "Odebrany",
+      "maximumGrossWeight": 1855,
+      "averageTrackWidth": null,
+      "euroNormForCommunities": true
+    }
+  }
+}
+
+=== PEŁNA OŚ CZASU (timeline) ===
+{
+  "timelineData": {
+    "events": [
+      {
+        "eventDate": "2009-06-24",
+        "eventDetails": [
+          {
+            "name": "Właściciel",
+            "value": "osoba fizyczna",
+            "additionalInformation": []
+          },
+          {
+            "name": "Województwo, w którym pojazd zarejestrowano",
+            "value": "kujawsko-pomorskie",
+            "additionalInformation": []
+          }
+        ],
+        "comment": null,
+        "eventName": "Pierwszy właściciel w Polsce (pozostał właścicielem do 30.10.2017)",
+        "eventType": "pierwszy-wlasciciel"
+      },
+      {
+        "eventDate": "2009-06-26",
+        "eventDetails": [],
+        "comment": null,
+        "eventName": "Pierwsza rejestracja w Polsce",
+        "eventType": "pierwsza-rejestracja-w-polsce"
+      },
+      {
+        "eventDate": "2012-04-13",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CW/005/P",
+            "additionalInformation": []
+          }
+        ],
+        "comment": null,
+        "eventName": "Okresowe badanie techniczne (ważne do 13.04.2014)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2014-05-09",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CW/013",
+            "additionalInformation": []
+          }
+        ],
+        "comment": null,
+        "eventName": "Okresowe badanie techniczne (ważne do 09.05.2015)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2015-05-07",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CW/005/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "7100 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 07.05.2016)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2016-05-05",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CW/005/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "10589 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 05.05.2017)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2017-05-15",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CW/005/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "12998 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 15.05.2018)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2017-10-30",
+        "eventDetails": [
+          {
+            "name": "Właściciel",
+            "value": "osoba fizyczna",
+            "additionalInformation": []
+          },
+          {
+            "name": "Województwo, w którym pojazd zarejestrowano",
+            "value": "kujawsko-pomorskie",
+            "additionalInformation": []
+          }
+        ],
+        "comment": null,
+        "eventName": "Zmiana właściciela (pozostał właścicielem do 27.06.2022)",
+        "eventType": "zmiana-wlasciciela"
+      },
+      {
+        "eventDate": "2018-05-16",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CTR/019/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "19500 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 16.05.2019)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2019-05-20",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CTR/019/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "27176 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 20.05.2020)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2020-05-20",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CTR/019/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "31606 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 20.05.2021)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2021-05-21",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CTR/019/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "35038 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 21.05.2022)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2022-05-23",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "CTR/019/P",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "38410 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 23.05.2023)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2022-06-27",
+        "eventDetails": [],
+        "comment": null,
+        "eventName": "Zbycie pojazdu",
+        "eventType": "zbycie"
+      },
+      {
+        "eventDate": "2022-06-27",
+        "eventDetails": [
+          {
+            "name": "Właściciel",
+            "value": "osoba fizyczna",
+            "additionalInformation": []
+          },
+          {
+            "name": "Województwo, w którym pojazd zarejestrowano",
+            "value": "mazowieckie",
+            "additionalInformation": []
+          }
+        ],
+        "comment": null,
+        "eventName": "Zmiana właściciela",
+        "eventType": "zmiana-wlasciciela"
+      },
+      {
+        "eventDate": "2022-06-27",
+        "eventDetails": [
+          {
+            "name": "Właściciel",
+            "value": "osoba fizyczna",
+            "additionalInformation": []
+          }
+        ],
+        "comment": null,
+        "eventName": "Dodanie współwłaściciela (pozostał współwłaścicielem do 07.03.2023)",
+        "eventType": "dodanie-wspolwlasciciela"
+      },
+      {
+        "eventDate": "2023-05-18",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "WGR/007",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "51954 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 18.05.2024)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2024-05-16",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "WGR/007",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "52998 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 16.05.2025)",
+        "eventType": "badanie-techniczne-okresowe"
+      },
+      {
+        "eventDate": "2025-05-08",
+        "eventDetails": [
+          {
+            "name": "",
+            "value": "Policja",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "54076 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy kontroli drogowej gromadzimy od 2020)",
+        "eventName": "Odczyt drogomierza podczas kontroli drogowej",
+        "eventType": "odczyt-drogomierza-podczas-kontroli"
+      },
+      {
+        "eventDate": "2025-05-15",
+        "eventDetails": [
+          {
+            "name": "Wynik badania",
+            "value": "pozytywny",
+            "additionalInformation": []
+          },
+          {
+            "name": "Numer SKP",
+            "value": "WGR/007",
+            "additionalInformation": []
+          },
+          {
+            "name": "Odczytany stan drogomierza",
+            "value": "54096 km",
+            "additionalInformation": []
+          }
+        ],
+        "comment": "(Uwaga. Stan drogomierza przy badaniu technicznym gromadzimy od 2014)",
+        "eventName": "Okresowe badanie techniczne (ważne do 15.05.2026)",
+        "eventType": "badanie-techniczne-okresowe"
+      }
+    ],
+    "yearOfManufacture": 2009,
+    "reportGenerationDate": "2026-03-24",
+    "totalOwners": 3,
+    "totalCoOwners": 1,
+    "currentOwners": 1,
+    "currentCoOwners": 0,
+    "validOcInsurance": true,
+    "technicalInspectionStatus": "aktualne",
+    "vehicleLost": false,
+    "insuranceExpiryDate": "2026-06-29",
+    "registrationProvince": "mazowieckie",
+    "odometerReadings": [
+      {
+        "value": 54096,
+        "unit": "km",
+        "odometerNumber": "FIRST",
+        "error": false,
+        "errorMessage": null,
+        "rolledBack": false
+      }
+    ]
+  }
+}

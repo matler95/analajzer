@@ -583,8 +583,22 @@ body {
   border-right: 1px solid var(--border2);
 }
 
-.result-tab {
+.result-tab-cell {
   flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.result-tab-cell.is-disabled {
+  cursor: not-allowed;
+}
+
+.result-tab-cell .result-tab {
+  flex: 1;
+  width: 100%;
+}
+
+.result-tab {
   background: var(--card);
   border: none;
   cursor: pointer;
@@ -598,8 +612,14 @@ body {
   border-bottom: 2px solid transparent;
 }
 
-.result-tab:hover { color: var(--text); background: var(--card2); }
+.result-tab:hover:not(:disabled) { color: var(--text); background: var(--card2); }
 .result-tab.on { color: var(--amber); border-bottom-color: var(--amber); background: var(--card); }
+
+.result-tab:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  color: var(--sub);
+}
 
 .result-tab-content { animation: fadeUp .25s ease; }
 
@@ -875,7 +895,7 @@ body {
 }
 
 .cepik-disclaimer {
-  margin-bottom: 14px;
+  margin-top: 14px;
   padding: 10px 14px;
   border-left: 3px solid var(--amber);
   background: var(--amber-bg);
@@ -937,6 +957,81 @@ body {
 
 .odo-date { color: var(--sub); }
 .odo-val { color: var(--text); font-weight: 600; }
+
+/* ─── ODOMETER CHART (CEPiK) ─────────────────────────────── */
+.odo-chart-wrap {
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: var(--card2);
+}
+
+.odo-chart-caption {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.odo-chart-caption-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.odo-chart-point {
+  cursor: help;
+}
+
+.odo-chart-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.odo-chart-svg {
+  width: 100%;
+  max-height: 220px;
+  display: block;
+}
+
+.odo-chart-grid {
+  stroke: var(--border2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.odo-chart-line {
+  stroke: var(--amber);
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.odo-chart-dot {
+  fill: var(--card);
+  stroke: var(--amber);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.odo-chart-axis-y,
+.odo-chart-axis-x {
+  fill: var(--sub);
+  font-size: 9px;
+  font-family: var(--ff-m);
+}
+
+.odo-chart-unit {
+  fill: var(--sub);
+  font-size: 8px;
+  opacity: 0.75;
+  font-family: var(--ff-m);
+}
 
 /* ─── DESCRIPTION BOX ───────────────────────────────────── */
 .desc-box {
