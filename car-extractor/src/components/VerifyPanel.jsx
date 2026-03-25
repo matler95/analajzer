@@ -9,7 +9,7 @@ function getStepCount(data) {
   return done;
 }
 
-export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLoading, cepikErr }) {
+export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLoading, cepikErr, vinLoading }) {
   const [pasteMsg, setPasteMsg] = useState(null);
 
   const plate = data?.licensePlate || "";
@@ -77,15 +77,32 @@ export default function VerifyPanel({ me, data, onUpdateField, onVerify, cepikLo
 
         <div className="verify-field">
           <label className="verify-field-label" htmlFor="verify-vin">VIN</label>
-          <input
-            id="verify-vin"
-            className={`verify-input ${vin ? "has-value" : ""}`}
-            value={vin}
-            placeholder="17 znaków"
-            maxLength={17}
-            onChange={e => onUpdateField("vin", normalizeVin(e.target.value))}
-          />
-          {vin && (
+          <div style={{ position: "relative" }}>
+            <input
+              id="verify-vin"
+              className={`verify-input ${vin ? "has-value" : ""}`}
+              value={vin}
+              placeholder={vinLoading ? "Pobieranie VIN..." : "17 znaków"}
+              maxLength={17}
+              disabled={vinLoading}
+              style={{ opacity: vinLoading ? 0.7 : 1 }}
+              onChange={e => onUpdateField("vin", normalizeVin(e.target.value))}
+            />
+            {vinLoading && (
+              <div style={{
+                position: "absolute",
+                right: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                fontSize: 12,
+                color: "var(--accent)",
+                pointerEvents: "none"
+              }}>
+                <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
+              </div>
+            )}
+          </div>
+          {vin && !vinLoading && (
             <div className={`validation-msg ${isValidVin(vin) ? "valid" : "invalid"}`}>
               {vin.length}/17 {isValidVin(vin) ? "✓" : "✗"}
             </div>

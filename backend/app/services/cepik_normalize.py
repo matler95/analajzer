@@ -308,10 +308,9 @@ def normalize_response(
     if not isinstance(tdata, dict):
         tdata = {}
 
-    # Liczniki właścicieli i współwłaścicieli (często w timelineData: totalOwners/totalCoOwners).
-    # Dodajemy do technicalData, żeby front mógł wyświetlić „liczbę właścicieli” z CEPiK.
-    for k in ("totalOwners", "totalCoOwners", "currentOwners", "currentCoOwners"):
-        if k in tdata:
+    # Liczniki właścicieli i współwłaścicieli oraz ubezpieczenie (często w timelineData).
+    for k in ("totalOwners", "totalCoOwners", "currentOwners", "currentCoOwners", "insuranceExpiryDate", "registrationProvince"):
+        if k in tdata and td.get(k) in (None, ""):
             td[k] = tdata.get(k)
 
     raw_odo = _extract_odometer_list(tl, tdata)

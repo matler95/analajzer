@@ -28,6 +28,7 @@ export default function App() {
     portal, savedSearchId, setSavedSearchId,
     saveBusy, saveMsg, setSaveMsg,
     cepik, setCepik,
+    vinLoading,
     run, saveSearch, updateField,
   } = useSearch({ me });
 
@@ -178,6 +179,7 @@ export default function App() {
             me={me}
             cepikLoading={cepikLoading}
             cepikErr={cepikErr}
+            vinLoading={vinLoading}
             onUpdateField={updateField}
             onVerify={verifyGov}
             onSave={saveSearch}

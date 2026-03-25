@@ -163,7 +163,7 @@ function HeroImage({ images, verificationBadge, brand, model, price, currency, p
 /* ─── MAIN COMPONENT ────────────────────────────────────── */
 export default function ResultCard({
   data, cepik, savedSearchId, saveMsg, saveBusy,
-  me, cepikLoading, cepikErr,
+  me, cepikLoading, cepikErr, vinLoading,
   onUpdateField, onVerify, onSave,
 }) {
   const [activeTab, setActiveTab] = useState("specs");
@@ -280,6 +280,7 @@ export default function ResultCard({
             onVerify={onVerify}
             cepikLoading={cepikLoading}
             cepikErr={cepikErr}
+            vinLoading={vinLoading}
           />
         </div>
       )}

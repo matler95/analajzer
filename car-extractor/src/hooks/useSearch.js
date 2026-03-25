@@ -12,6 +12,7 @@ export function useSearch({ me }) {
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
   const [cepik, setCepik] = useState(null);
+  const [vinLoading, setVinLoading] = useState(false);
 
   const portal = detectPortal(url);
 
@@ -23,6 +24,7 @@ export function useSearch({ me }) {
     setData(null);
     setSavedSearchId(null);
     setCepik(null);
+    setVinLoading(false);
     setSaveMsg(null);
     try {
       const normU = normListingUrl(u);
@@ -47,10 +49,35 @@ export function useSearch({ me }) {
           }
         }
       }
-      const md = await fetchPage(u);
+      const mdPromise = fetchPage(u);
+      
+      const mdResult = await mdPromise.catch(e => { throw e; });
+      const md = mdResult;
       const car = parseMd(md, u);
       car.listingUrl = normU;
+      
       setData(car);
+      setLoading(false); // End main loading so skeleton disappears
+
+      // Call scraper API only for otomoto AFTER rendering initial data
+      const isOtomoto = portal === "otomoto" || u.includes("otomoto.pl");
+      if (isOtomoto && !car.vin) {
+        setVinLoading(true);
+        try {
+          const r = await apiFetch(`/scraper/vin?listing_url=${encodeURIComponent(normU)}`);
+          if (r.ok) {
+            const json = await r.json();
+            if (json && json.vin) {
+              car.vin = json.vin;
+              setData(prev => prev ? { ...prev, vin: json.vin } : prev);
+            }
+          }
+        } catch (e) {
+          // ignore vin fetch error silently
+        } finally {
+          setVinLoading(false);
+        }
+      }
 
       // Auto-save when logged in
       if (me) {
@@ -124,6 +151,7 @@ export function useSearch({ me }) {
     saveBusy,
     saveMsg, setSaveMsg,
     cepik, setCepik,
+    vinLoading,
     run,
     saveSearch,
     updateField,
