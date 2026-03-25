@@ -64,6 +64,12 @@ def extract_vehicle_core(vehicle: dict[str, Any] | None) -> dict[str, Any]:
         out.setdefault("year", basic.get("yearOfManufacture"))
         out.setdefault("vin", basic.get("identifyingFeature"))
         out.setdefault("firstRegistrationDate", basic.get("firstRegistrationDate"))
+        out.setdefault(
+            "validOcInsurance",
+            basic.get("validOcInsurance") if basic.get("validOcInsurance") is not None else basic.get("hasCurrentOCPolicy"),
+        )
+        out.setdefault("insuranceExpiryDate", basic.get("insuranceExpiryDate"))
+        out.setdefault("registrationProvince", basic.get("registrationProvince"))
     if isinstance(detailed, dict):
         out.setdefault("fuelType", detailed.get("fuelType"))
         out.setdefault("engineDisplacement", detailed.get("engineCapacity"))
@@ -160,6 +166,8 @@ def _normalize_odometer_entry(item: Any) -> dict[str, Any] | None:
     on = item.get("odometerNumber")
     if on is not None:
         out["odometerNumber"] = on
+    if "rolledBack" in item:
+        out["rolledBack"] = item.get("rolledBack")
     return out
 
 
@@ -299,6 +307,12 @@ def normalize_response(
     tdata = tl.get("timelineData") or tl.get("data") or {}
     if not isinstance(tdata, dict):
         tdata = {}
+
+    # Liczniki właścicieli i współwłaścicieli (często w timelineData: totalOwners/totalCoOwners).
+    # Dodajemy do technicalData, żeby front mógł wyświetlić „liczbę właścicieli” z CEPiK.
+    for k in ("totalOwners", "totalCoOwners", "currentOwners", "currentCoOwners"):
+        if k in tdata:
+            td[k] = tdata.get(k)
 
     raw_odo = _extract_odometer_list(tl, tdata)
     odometer_norm: list[dict[str, Any]] = []
