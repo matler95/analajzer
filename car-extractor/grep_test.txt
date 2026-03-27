@@ -1,0 +1,17 @@
+.vdb-row
+.vdb-row
+.vdb-row-img-wrap
+.vdb-row-img
+.vdb-row-img--empty
+.vdb-row-info
+.vdb-row-title
+.vdb-row-sub
+.vdb-row-filter
+.vdb-row-date
+.vdb-row-price-wrap
+.vdb-row-price
+.vdb-row-cur
+.vdb-row-actions
+.vdb-row
+.vdb-row-price-wrap
+.vdb-row-img-wrap

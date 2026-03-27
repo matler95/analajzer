@@ -2771,7 +2771,7 @@ body {
   gap: 4px;
 }
 
-.vdb-row {
+/* .vdb-row {
   display: grid;
   grid-template-columns: 90px 1fr auto auto;
   align-items: center;
@@ -2785,7 +2785,7 @@ body {
 
 .vdb-row:hover { border-color: var(--amber); background: var(--card2); }
 
-.vdb-row-img-wrap { width: 90px; height: 60px; flex-shrink: 0; border-radius: 3px; overflow: hidden; }
+.vdb-row-img-wrap { width: 90px; height: 60px; flex-shrink: 0; border-radius: 3px; overflow: hidden; } */
 
 .vdb-row-img {
   width: 100%;

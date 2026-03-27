@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import "./styles/app.css";
+import "./styles/additions.css";
 
 import { useAuth } from "./hooks/useAuth.js";
 import { useSearch } from "./hooks/useSearch.js";
@@ -75,9 +76,7 @@ export default function App() {
   const { job, isRunning, startJob, cancelJob } = useBackgroundJob({
     me,
     onJobComplete: useCallback(({ processedCount, filterId }) => {
-      // Refresh vehicle database tab after job completes
       setDbRefreshKey(k => k + 1);
-      // Update filter last run info
       if (filterId) {
         markFilterRun(filterId, processedCount);
       }
@@ -124,7 +123,6 @@ export default function App() {
         comparison: row.latest_verification.comparison || null,
       });
     }
-    // Switch to search tab to show the result
     setMainTab("search");
     setSaveMsg("Otworzono z bazy pojazdów");
   }, [openHistoryItem, setData, setSavedSearchId, setCepik, setCepikErr, setSaveMsg]);

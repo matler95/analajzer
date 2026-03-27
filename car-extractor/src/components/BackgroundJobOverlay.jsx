@@ -6,7 +6,6 @@ function extractShortName(url) {
     const path = new URL(url).pathname;
     const parts = path.split("/").filter(Boolean);
     const last = parts[parts.length - 1] || "";
-    // Remove trailing hash ID (e.g. -ID123456789) from otomoto slugs
     return last.replace(/-ID\d+$/, "").replace(/-/g, " ").slice(0, 40) || null;
   } catch {
     return url.slice(-40);
@@ -20,6 +19,7 @@ export default function BackgroundJobOverlay({ job, onCancel }) {
   }, [job]);
 
   const shortName = useMemo(() => extractShortName(job?.current), [job?.current]);
+  const isMultiBatch = (job?.batchTotal ?? 1) > 1;
 
   if (!job) return null;
 
@@ -33,8 +33,28 @@ export default function BackgroundJobOverlay({ job, onCancel }) {
         </div>
       </div>
 
+      {/* Multi-batch indicator */}
+      {isMultiBatch && (
+        <div className="bgjob-batch-row">
+          {Array.from({ length: job.batchTotal }).map((_, i) => (
+            <div
+              key={i}
+              className={`bgjob-batch-dot ${
+                i < job.batchIndex ? "done" : i === job.batchIndex ? "active" : ""
+              }`}
+              title={`Partia ${i + 1}`}
+            />
+          ))}
+          <span className="bgjob-batch-label">
+            Marka {job.batchIndex + 1}/{job.batchTotal}
+          </span>
+        </div>
+      )}
+
       {job.phase === "scraping" ? (
-        <div className="bgjob-phase">Pobieranie listy ogłoszeń…</div>
+        <div className="bgjob-phase">
+          {job.phaseMsg || "Pobieranie listy ogłoszeń…"}
+        </div>
       ) : (
         <>
           <div className="bgjob-progress-wrap">
