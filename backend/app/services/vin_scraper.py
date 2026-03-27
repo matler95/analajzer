@@ -12,12 +12,8 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 def apply_stealth(page):
     try:
-        import playwright_stealth
-        try:
-            playwright_stealth.stealth_sync(page)
-        except AttributeError:
-            # stealth_async might just be stealth
-            playwright_stealth.stealth(page)
+        from playwright_stealth import stealth_sync
+        stealth_sync(page)
     except Exception as e:
         print(f"Uwaga: Nie udało się nałożyć pełnego stealth: {e}")
 
@@ -27,26 +23,26 @@ def login_and_save_state_sync():
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, 
+        browser = p.chromium.launch(headless=False,
             args=["--disable-blink-features=AutomationControlled"])
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             viewport={'width': 1920, 'height': 1080}
         )
         page = context.new_page()
-        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")        
-        
+        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
         print("\n" + "="*50)
         print("KROK 1: LOGOWANIE")
         print("Zaloguj się teraz w otwartym oknie przeglądarki.")
         print("="*50)
-        
+
         page.goto("https://www.otomoto.pl/authentication?redirectUrl=%2Fpost-login")
-        
+
         try:
             print("[*] Czekam na wykrycie konta (do 2 minut)...")
             page.wait_for_selector('[data-testid="logout-button"], [data-test="link-account"], .ooa-1sd0kbw', timeout=120000)
-            
+
             user_name = "użytkownik"
             try:
                 user_name = page.inner_text('.ooa-1sd0kbw')
@@ -55,15 +51,15 @@ def login_and_save_state_sync():
 
             print(f"[+] Sukces! Zalogowano jako: {user_name}")
             print("[*] Zapisuję sesję, nie zamykaj okna...")
-            
-            time.sleep(5) 
+
+            time.sleep(5)
             context.storage_state(path=AUTH_FILE)
             print(f"[+] Plik {AUTH_FILE} został utworzony.")
-            
+
         except Exception as e:
             print(f"[-] Timeout: Nie udało się automatycznie wykryć zalogowania.")
             print(f"[*] Szczegóły błędu: {e}")
-        
+
         browser.close()
 
 def _get_vin_stealth_sync(url: str) -> str | None:
@@ -77,7 +73,7 @@ def _get_vin_stealth_sync(url: str) -> str | None:
         print(f"[+] Plik sesji {AUTH_FILE} znaleziony.")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True) 
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             storage_state=AUTH_FILE if os.path.exists(AUTH_FILE) else None,
             user_agent=USER_AGENT,
@@ -89,7 +85,7 @@ def _get_vin_stealth_sync(url: str) -> str | None:
         try:
             print(f"[*] Ładowanie ogłoszenia: {url}")
             page.goto(url, wait_until="domcontentloaded")
-            time.sleep(random.uniform(3, 5)) 
+            time.sleep(random.uniform(3, 5))
 
             try:
                 cookie_btn = page.locator("#onetrust-accept-btn-handler")
@@ -110,10 +106,10 @@ def _get_vin_stealth_sync(url: str) -> str | None:
                 time.sleep(random.uniform(1, 2))
                 print("[*] Klikam w 'Wyświetl VIN'...")
                 btn.click()
-                
+
                 target_selector = "[data-testid='advert-vin'] p"
                 page.wait_for_selector(target_selector, timeout=10000)
-                
+
                 vin = page.locator(target_selector).inner_text()
                 return vin.strip()
             else:
@@ -121,7 +117,7 @@ def _get_vin_stealth_sync(url: str) -> str | None:
                 if already_visible.is_visible():
                     text = already_visible.inner_text()
                     return text.strip()
-                
+
                 print("[-] Nie znaleziono przycisku VIN.")
                 return None
 
@@ -142,3 +138,107 @@ async def check_and_login_session():
     else:
         print(f"[+] Znaleziono sesję otomoto na starcie: {AUTH_FILE}")
 
+
+def _get_search_listing_urls_sync(search_url: str, max_pages: int = 2) -> list[str]:
+    """Scrapes listing URLs from an otomoto search results page using Playwright."""
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+    if not os.path.exists(AUTH_FILE):
+        print(f"[-] Brak pliku sesji. Uruchamiam logowanie...")
+        login_and_save_state_sync()
+
+    all_urls: list[str] = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            storage_state=AUTH_FILE if os.path.exists(AUTH_FILE) else None,
+            user_agent=USER_AGENT,
+            viewport={"width": 1920, "height": 1080},
+        )
+        page = context.new_page()
+        apply_stealth(page)
+
+        current_url = search_url
+        for page_num in range(max_pages):
+            try:
+                print(f"[*] Scraping strona {page_num + 1}: {current_url}")
+                page.goto(current_url, wait_until="domcontentloaded", timeout=30000)
+                time.sleep(random.uniform(2, 4))
+
+                # Handle cookie banner
+                try:
+                    cookie_btn = page.locator("#onetrust-accept-btn-handler")
+                    if cookie_btn.is_visible(timeout=2000):
+                        cookie_btn.click()
+                except Exception:
+                    pass
+
+                # Extract listing URLs via JS evaluation
+                page_urls: list[str] = page.evaluate("""() => {
+                    const seen = new Set();
+                    const result = [];
+                    const anchors = document.querySelectorAll('a[href]');
+                    const patterns = [
+                        '/osobowe/oferta/',
+                        '/ciezarowe-dostawcze/oferta/',
+                        '/motocykle-quady/oferta/',
+                        '/osobowe-inne/oferta/'
+                    ];
+                    anchors.forEach(a => {
+                        const href = a.href || '';
+                        if (patterns.some(p => href.includes(p))) {
+                            const clean = href.split('?')[0].split('#')[0];
+                            if (clean && !seen.has(clean)) {
+                                seen.add(clean);
+                                result.push(clean);
+                            }
+                        }
+                    });
+                    return result;
+                }""")
+
+                all_urls.extend(page_urls)
+                print(f"[+] Strona {page_num + 1}: znaleziono {len(page_urls)} ogłoszeń")
+
+                if page_num < max_pages - 1:
+                    # Try to find and navigate to next page
+                    next_href: str | None = page.evaluate("""() => {
+                        const selectors = [
+                            '[data-testid="pagination-step-forwards"]',
+                            'a[aria-label="Next page"]',
+                            'li.pagination-item--next a',
+                            'a[rel="next"]'
+                        ];
+                        for (const sel of selectors) {
+                            const el = document.querySelector(sel);
+                            if (el && el.href) return el.href;
+                        }
+                        return null;
+                    }""")
+                    if next_href:
+                        current_url = next_href
+                    else:
+                        break
+                else:
+                    break
+
+            except Exception as e:
+                print(f"[-] Błąd na stronie {page_num + 1}: {e}")
+                break
+
+        browser.close()
+
+    # Deduplicate preserving order
+    seen_set: set[str] = set()
+    unique: list[str] = []
+    for u in all_urls:
+        if u not in seen_set:
+            seen_set.add(u)
+            unique.append(u)
+    return unique
+
+
+async def get_search_listing_urls(search_url: str, max_pages: int = 2) -> list[str]:
+    return await run_in_threadpool(_get_search_listing_urls_sync, search_url, max_pages)
