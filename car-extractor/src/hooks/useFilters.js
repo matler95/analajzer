@@ -1,11 +1,17 @@
 import { useState, useCallback } from "react";
 
-const FILTERS_KEY = "analajzer_filters_v1";
+const FILTERS_KEY = "analajzer_filters_v2";
 
 function loadFilters() {
   try {
     const raw = localStorage.getItem(FILTERS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Migrate old v1 filters that had maxPages
+    return parsed.map(f => {
+      const { maxPages, ...rest } = f;
+      return rest;
+    });
   } catch {
     return [];
   }
@@ -26,11 +32,15 @@ export function useFilters() {
     const newFilter = {
       id: `f_${Date.now()}`,
       name: data.name?.trim() || "Filtr bez nazwy",
-      searchUrl: data.searchUrl?.trim() || "",
-      maxPages: Number(data.maxPages) || 2,
+      vehicles: data.vehicles || [],
+      params: data.params || {},
+      searchUrls: data.searchUrls || (data.searchUrl ? [data.searchUrl] : []),
+      searchUrl: data.searchUrl || data.searchUrls?.[0] || "",
       createdAt: new Date().toISOString(),
       lastRunAt: null,
       lastRunCount: null,
+      lastRunNewCount: null,
+      lastRunArchivedCount: null,
     };
     setFilters(prev => {
       const next = [...prev, newFilter];
@@ -56,11 +66,17 @@ export function useFilters() {
     });
   }, []);
 
-  const markFilterRun = useCallback((id, count) => {
+  const markFilterRun = useCallback((id, stats) => {
     setFilters(prev => {
       const next = prev.map(f =>
         f.id === id
-          ? { ...f, lastRunAt: new Date().toISOString(), lastRunCount: count }
+          ? {
+              ...f,
+              lastRunAt: new Date().toISOString(),
+              lastRunCount: stats.processedCount ?? 0,
+              lastRunNewCount: stats.newCount ?? 0,
+              lastRunArchivedCount: stats.archivedCount ?? 0,
+            }
           : f
       );
       persistFilters(next);

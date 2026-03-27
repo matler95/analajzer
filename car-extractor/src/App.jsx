@@ -8,7 +8,8 @@ import { useCepik } from "./hooks/useCepik.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useFilters } from "./hooks/useFilters.js";
 import { useBackgroundJob } from "./hooks/useBackgroundJob.js";
-import { mergeSearchRecord } from "./utils/normalize.js";
+import { mergeSearchRecord, stripDebug } from "./utils/normalize.js";
+import { apiFetch } from "./api.js";
 
 import AuthBar from "./components/AuthBar.jsx";
 import HistoryDrawer from "./components/HistoryDrawer.jsx";
@@ -20,23 +21,24 @@ import VehicleDatabaseTab from "./components/VehicleDatabaseTab.jsx";
 import BackgroundJobOverlay from "./components/BackgroundJobOverlay.jsx";
 
 const MAIN_TABS = [
-  { key: "search", label: "Wyszukaj" },
-  { key: "filters", label: "Filtry" },
-  { key: "database", label: "Baza pojazdów" },
+  { key: "search",   label: "Wyszukaj"      },
+  { key: "filters",  label: "Filtry"         },
+  { key: "database", label: "Baza pojazdów"  },
 ];
 
 export default function App() {
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [mainTab, setMainTab] = useState("search");
+  const [historyOpen,  setHistoryOpen]  = useState(false);
+  const [mainTab,      setMainTab]      = useState("search");
   const [dbRefreshKey, setDbRefreshKey] = useState(0);
+  const [uxNoticeGlobal, setUxNoticeGlobal] = useState(null);
 
-  // ─── Auth ───────────────────────────────────────────────
+  // ─── Auth ────────────────────────────────────────────────
   const {
     me, authEmail, setAuthEmail, authPass, setAuthPass, authErr,
     login, register, logout,
   } = useAuth();
 
-  // ─── Search ─────────────────────────────────────────────
+  // ─── Search ──────────────────────────────────────────────
   const {
     url, setUrl, loading, data, setData, error,
     portal, savedSearchId, setSavedSearchId,
@@ -46,8 +48,8 @@ export default function App() {
     run, saveSearch, updateField,
   } = useSearch({ me });
 
-  // ─── CEPiK ──────────────────────────────────────────────
-  const { cepikLoading, cepikErr, setCepikErr, verifyGov, canVerify } = useCepik({
+  // ─── CEPiK ───────────────────────────────────────────────
+  const { cepikLoading, cepikErr, setCepikErr, verifyGov } = useCepik({
     me,
     data,
     savedSearchId,
@@ -57,7 +59,7 @@ export default function App() {
     },
   });
 
-  // ─── History ────────────────────────────────────────────
+  // ─── History (kept for backward compat, drawer still works) ──
   const {
     history, histLoading, histVerifyBusy,
     uxNotice, setUxNotice,
@@ -69,58 +71,114 @@ export default function App() {
     if (historyOpen && me) loadHistory();
   }, [historyOpen, me, loadHistory]);
 
-  // ─── Filters ────────────────────────────────────────────
+  // ─── Filters ─────────────────────────────────────────────
   const { filters, addFilter, removeFilter, updateFilter, markFilterRun } = useFilters();
 
-  // ─── Background Job ─────────────────────────────────────
+  // ─── Background Job ──────────────────────────────────────
   const { job, isRunning, startJob, cancelJob } = useBackgroundJob({
     me,
-    onJobComplete: useCallback(({ processedCount, filterId }) => {
+    onJobComplete: useCallback(({ processedCount, newCount, archivedCount, priceChanges, filterId }) => {
       setDbRefreshKey(k => k + 1);
       if (filterId) {
-        markFilterRun(filterId, processedCount);
+        markFilterRun(filterId, { processedCount, newCount, archivedCount });
+      }
+      // Show summary notice
+      const parts = [];
+      if (newCount > 0)      parts.push(`${newCount} nowych`);
+      if (archivedCount > 0) parts.push(`${archivedCount} archiwalnych`);
+      if (priceChanges > 0)  parts.push(`${priceChanges} zmian cen`);
+      if (parts.length > 0) {
+        setUxNoticeGlobal({ msg: `Skanowanie zakończone: ${parts.join(", ")}` });
+        setTimeout(() => setUxNoticeGlobal(null), 8000);
       }
     }, [markFilterRun]),
   });
 
-  // ─── Open from history ──────────────────────────────────
+  // ─── Save manual search to DB (with __source: "manual") ──
+  const saveManualToDb = useCallback(async ({ cepikResult } = {}) => {
+    if (!data || !me) return;
+    const normUrl = data.listingUrl;
+    const snap = {
+      ...stripDebug(data),
+      __source: "manual",
+      __isNew: false,
+      __firstSeenAt: new Date().toISOString(),
+      __lastSeenAt: new Date().toISOString(),
+      __archived: false,
+    };
+
+    // Check deduplication with auto-sourced entries
+    try {
+      const existRes = await apiFetch(`/searches/lookup/by-url?listing_url=${encodeURIComponent(normUrl)}`);
+      if (existRes.ok) {
+        const existRow = await existRes.json();
+        if (existRow?.id && existRow.snapshot_json?.__source === "auto") {
+          // Already tracked in a filter group — just notify user
+          setSaveMsg("Pojazd już jest w bazie (skanowanie automatyczne).");
+          setSavedSearchId(existRow.id);
+          return;
+        }
+      }
+    } catch { /* silent */ }
+
+    const res = await apiFetch("/searches", {
+      method: "POST",
+      body: {
+        listing_url: normUrl,
+        snapshot_json: snap,
+        manual_vin: data.vin || null,
+        manual_first_registration: data.firstRegistration || null,
+        manual_license_plate: data.licensePlate || null,
+        latest_verification: cepikResult ? {
+          technicalData:  cepikResult.technicalData  || {},
+          odometerReadings: cepikResult.odometerReadings || [],
+          events:         cepikResult.events         || [],
+          comparison:     cepikResult.comparison     || null,
+          meta:           cepikResult.meta           || {},
+        } : null,
+      },
+    });
+    if (res.ok) {
+      const j = await res.json();
+      setSavedSearchId(j.id);
+      setSaveMsg("Zapisano w bazie pojazdów.");
+      setDbRefreshKey(k => k + 1);
+    }
+  }, [data, me, setSaveMsg, setSavedSearchId]);
+
+  // ─── Open from history / DB ──────────────────────────────
   const handleOpenHistoryItem = useCallback(async (id) => {
     const row = await openHistoryItem(id);
     if (!row) return;
     setData(mergeSearchRecord(row));
     setSavedSearchId(row.id);
-    setCepik(null);
-    setCepikErr(null);
-    setSaveMsg(null);
+    setCepik(null); setCepikErr(null); setSaveMsg(null);
     if (row.latest_verification?.normalized) {
       setCepik({
-        technicalData: row.latest_verification.normalized.technicalData || {},
+        technicalData:    row.latest_verification.normalized.technicalData    || {},
         odometerReadings: row.latest_verification.normalized.odometerReadings || [],
-        events: row.latest_verification.normalized.events || [],
-        meta: { fromHistory: true, cacheHit: row.latest_verification.cache_hit },
-        comparison: row.latest_verification.comparison || null,
+        events:           row.latest_verification.normalized.events           || [],
+        meta:             { fromHistory: true, cacheHit: row.latest_verification.cache_hit },
+        comparison:       row.latest_verification.comparison || null,
       });
     }
     setHistoryOpen(false);
     setMainTab("search");
   }, [openHistoryItem, setData, setSavedSearchId, setCepik, setCepikErr, setSaveMsg]);
 
-  // Open from vehicle database
   const handleOpenDbItem = useCallback(async (id) => {
     const row = await openHistoryItem(id);
     if (!row) return;
     setData(mergeSearchRecord(row));
     setSavedSearchId(row.id);
-    setCepik(null);
-    setCepikErr(null);
-    setSaveMsg(null);
+    setCepik(null); setCepikErr(null); setSaveMsg(null);
     if (row.latest_verification?.normalized) {
       setCepik({
-        technicalData: row.latest_verification.normalized.technicalData || {},
+        technicalData:    row.latest_verification.normalized.technicalData    || {},
         odometerReadings: row.latest_verification.normalized.odometerReadings || [],
-        events: row.latest_verification.normalized.events || [],
-        meta: { fromHistory: true, cacheHit: row.latest_verification.cache_hit },
-        comparison: row.latest_verification.comparison || null,
+        events:           row.latest_verification.normalized.events           || [],
+        meta:             { fromHistory: true, cacheHit: row.latest_verification.cache_hit },
+        comparison:       row.latest_verification.comparison || null,
       });
     }
     setMainTab("search");
@@ -130,18 +188,18 @@ export default function App() {
   const handleDeleteHistoryItem = useCallback(async (id) => {
     const deletedId = await deleteHistoryItem(id);
     if (deletedId && savedSearchId === deletedId) {
-      setSavedSearchId(null);
-      setData(null);
-      setCepik(null);
+      setSavedSearchId(null); setData(null); setCepik(null);
     }
     await loadHistory();
+    setDbRefreshKey(k => k + 1);
   }, [deleteHistoryItem, savedSearchId, setSavedSearchId, setData, setCepik, loadHistory]);
 
-  // ─── Run filter job ──────────────────────────────────────
   const handleRunFilter = useCallback((filter) => {
     if (isRunning) return;
     startJob(filter);
   }, [isRunning, startJob]);
+
+  const combinedNotice = uxNotice || (uxNoticeGlobal ? uxNoticeGlobal : null);
 
   return (
     <div className="app">
@@ -153,26 +211,19 @@ export default function App() {
           <div className="hdr-sub">OTOMOTO · OLX · via Jina AI</div>
         </div>
         <AuthBar
-          me={me}
-          authEmail={authEmail}
-          setAuthEmail={setAuthEmail}
-          authPass={authPass}
-          setAuthPass={setAuthPass}
-          authErr={authErr}
-          login={login}
-          register={register}
-          logout={logout}
+          me={me} authEmail={authEmail} setAuthEmail={setAuthEmail}
+          authPass={authPass} setAuthPass={setAuthPass} authErr={authErr}
+          login={login} register={register} logout={logout}
           onHistoryToggle={() => setHistoryOpen(o => !o)}
           historyOpen={historyOpen}
         />
       </header>
 
-      {/* ─── MAIN NAVIGATION ─── */}
+      {/* ─── MAIN NAV ─── */}
       <nav className="main-nav">
         {MAIN_TABS.map(tab => (
           <button
-            key={tab.key}
-            type="button"
+            key={tab.key} type="button"
             className={`main-nav-tab ${mainTab === tab.key ? "main-nav-tab--active" : ""}`}
             onClick={() => setMainTab(tab.key)}
           >
@@ -186,11 +237,8 @@ export default function App() {
 
       {/* ─── HISTORY DRAWER ─── */}
       <HistoryDrawer
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        history={history}
-        histLoading={histLoading}
-        histVerifyBusy={histVerifyBusy}
+        open={historyOpen} onClose={() => setHistoryOpen(false)}
+        history={history} histLoading={histLoading} histVerifyBusy={histVerifyBusy}
         me={me}
         onOpenItem={handleOpenHistoryItem}
         onDeleteItem={handleDeleteHistoryItem}
@@ -201,12 +249,9 @@ export default function App() {
       {/* ─── MAIN CONTENT ─── */}
       <div className="main">
 
-        {/* ══ SEARCH TAB ══════════════════════════════════════ */}
         {mainTab === "search" && (
           <>
-            <StatusBanner notice={uxNotice} />
-
-            {/* URL Input */}
+            <StatusBanner notice={combinedNotice} />
             <div className="input-area">
               <div className="section-label">URL ogłoszenia</div>
               <div className="input-wrap">
@@ -220,18 +265,13 @@ export default function App() {
                 {portal !== "unknown" && (
                   <div className={`portal-chip ${portal}`}>{portal.toUpperCase()}.PL</div>
                 )}
-                <button
-                  type="button"
-                  className="go-btn"
-                  onClick={run}
-                  disabled={loading || !url.trim()}
-                >
+                <button type="button" className="go-btn" onClick={run} disabled={loading || !url.trim()}>
                   {loading ? "···" : "ANALIZUJ"}
                 </button>
               </div>
               <div className="hint">
                 Obsługiwane: otomoto.pl <span className="hint-dot">·</span> olx.pl
-                <span className="hint-dot">·</span> Działa przez r.jina.ai — bez klucza API
+                <span className="hint-dot">·</span> Działa przez r.jina.ai
               </div>
             </div>
 
@@ -246,48 +286,35 @@ export default function App() {
 
             {data && (
               <ResultCard
-                data={data}
-                cepik={cepik}
-                savedSearchId={savedSearchId}
-                saveMsg={saveMsg}
-                saveBusy={saveBusy}
-                me={me}
-                cepikLoading={cepikLoading}
-                cepikErr={cepikErr}
-                vinLoading={vinLoading}
-                onUpdateField={updateField}
-                onVerify={verifyGov}
-                onSave={saveSearch}
+                data={data} cepik={cepik}
+                savedSearchId={savedSearchId} saveMsg={saveMsg} saveBusy={saveBusy}
+                me={me} cepikLoading={cepikLoading} cepikErr={cepikErr} vinLoading={vinLoading}
+                onUpdateField={updateField} onVerify={verifyGov}
+                onSave={saveManualToDb}
               />
             )}
           </>
         )}
 
-        {/* ══ FILTERS TAB ════════════════════════════════════ */}
         {mainTab === "filters" && (
           <FiltersTab
-            filters={filters}
-            isJobRunning={isRunning}
+            filters={filters} isJobRunning={isRunning}
             currentJobFilterId={job?.filterId}
-            onAdd={addFilter}
-            onRemove={removeFilter}
-            onRun={handleRunFilter}
+            onAdd={addFilter} onRemove={removeFilter} onRun={handleRunFilter}
             me={me}
           />
         )}
 
-        {/* ══ DATABASE TAB ════════════════════════════════════ */}
         {mainTab === "database" && (
           <VehicleDatabaseTab
             key={dbRefreshKey}
             me={me}
             onOpenItem={handleOpenDbItem}
+            filters={filters}
           />
         )}
-
       </div>
 
-      {/* ─── BACKGROUND JOB OVERLAY ─── */}
       <BackgroundJobOverlay job={job} onCancel={cancelJob} />
     </div>
   );

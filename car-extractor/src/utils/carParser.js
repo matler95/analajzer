@@ -278,10 +278,7 @@ function extractVinByScanning(text) {
   let bestDist = Infinity;
   for (const { cand, index } of candidates) {
     const d = Math.abs(index - anchor);
-    if (d < bestDist) {
-      bestDist = d;
-      best = cand;
-    }
+    if (d < bestDist) { bestDist = d; best = cand; }
   }
   return best;
 }
@@ -306,14 +303,7 @@ function extractVinFromOlxUrl(urlStr) {
 
 function resolveVin(md, kv, url) {
   const vinKv = fromKv(kv, "Numer VIN", "Numer vin", "VIN", "Vin");
-  const vinField = field(
-    md,
-    "Numer VIN",
-    "Numer vin",
-    "VIN",
-    "Vin number",
-    "Vehicle Identification Number",
-  );
+  const vinField = field(md, "Numer VIN", "Numer vin", "VIN", "Vin number", "Vehicle Identification Number");
   const raw = clean(vinKv ?? vinField);
   if (raw) {
     const v = normalizeVin(stripVinLabelPrefix(raw));
@@ -343,6 +333,59 @@ function extractLocationFromMarkdown(md) {
   return null;
 }
 
+/**
+ * Extract generation from otomoto Jina markdown.
+ *
+ * Otomoto renders generation as a labeled field in the spec table, e.g.:
+ *   | Generacja | E46 (1998-2006) |
+ *   Generacja  E46 (1998-2006)
+ *   **Generacja** E46 (1998-2006)
+ *
+ * The value typically looks like:
+ *   "E46 (1998-2006)"
+ *   "F30/F31/F34/F35 (2011-2019)"
+ *   "W205 (2013-2021)"
+ *   "C/HR (2016-2023)"
+ *   "Typ 8V (2012-2020)"
+ *
+ * We want the full string as-is from otomoto, not derived from year.
+ */
+function extractGeneration(md, kv) {
+  // 1. Try KV map (most reliable — catches table and inline colon formats)
+  const fromKvRaw = fromKv(
+    kv,
+    "Generacja",
+    "Generation",
+    "generacja",
+  );
+  if (fromKvRaw) return clean(fromKvRaw);
+
+  // 2. Try direct regex patterns in the markdown text
+  //    Handles: "Generacja  E46 (1998-2006)" with multiple spaces
+  //    and bold: "**Generacja** E46 (1998-2006)"
+  //    and table: "| Generacja | E46 (1998-2006) |"
+  const patterns = [
+    // Table row: | Generacja | value |
+    /\|\s*Generacja\s*\|\s*([^|\n]{2,80}?)\s*\|/i,
+    // Inline with colon: Generacja: E46 (1998-2006)
+    /\bGeneracja\s*:\s*([^\n|*]{2,80})/i,
+    // Bold label then space: **Generacja** E46 (...)  or  *Generacja* E46
+    /\*{1,2}Generacja\*{1,2}\s+([^\n*|]{2,80})/i,
+    // Plain label with multiple spaces (otomoto uses 2+ spaces as separator)
+    /\bGeneracja\s{2,}([^\n|]{2,80})/i,
+    // Next-line format: label on one line, value on next
+    /\bGeneracja\s*\n\s*([^\n#|*]{2,80})/i,
+  ];
+
+  for (const re of patterns) {
+    const m = md.match(re);
+    const val = clean(m?.[1]);
+    if (val && !/^Generacja$/i.test(val)) return val;
+  }
+
+  return null;
+}
+
 /* ─── MAIN PARSER ────────────────────────────────────────── */
 
 export function parseMd(md, url) {
@@ -366,6 +409,9 @@ export function parseMd(md, url) {
     if (v.length > 1 && v.length < 60) variant = v;
   }
 
+  // Extract generation — dedicated field separate from variant
+  const generation = extractGeneration(md, kv);
+
   const priceRaw = field(md, "Cena", "Price");
   const price = priceRaw
     ? toNum(priceRaw.replace(/\s*(PLN|zł|EUR|USD).*/i, ""))
@@ -375,40 +421,27 @@ export function parseMd(md, url) {
     fieldNum(md, "Rok produkcji", "Rok", "Year") ??
     (() => { const m = md.match(/Rok\s+produkcji[^0-9]{0,20}([12]\d{3})/i); return m ? +m[1] : null; })();
 
-  const drivetrainKv = fromKv(kv, "Napęd", "Rodzaj napędu", "Drive");
+  const drivetrainKv    = fromKv(kv, "Napęd", "Rodzaj napędu", "Drive");
   const drivetrainField = field(md, "Napęd", "Rodzaj napędu", "Drive");
-  const licensePlateKv = fromKv(kv, "Numer rejestracyjny pojazdu", "Numer rejestracyjny", "License plate");
+  const licensePlateKv  = fromKv(kv, "Numer rejestracyjny pojazdu", "Numer rejestracyjny", "License plate");
   const licensePlateField = field(md, "Numer rejestracyjny pojazdu", "Numer rejestracyjny", "License plate");
-  const locationKv = fromKv(kv, "Lokalizacja", "Miasto", "Location", "City");
-  const locationField = field(md, "Lokalizacja", "Miasto", "Location", "City");
-  const locationMap = extractLocationFromMarkdown(md);
-  const sellerKv = fromKv(kv, "Sprzedający", "Informacje o sprzedającym", "Seller");
-  const sellerField = field(md, "Sprzedający", "Informacje o sprzedającym", "Seller");
-  const sellerSection = (() => {
+  const locationKv      = fromKv(kv, "Lokalizacja", "Miasto", "Location", "City");
+  const locationField   = field(md, "Lokalizacja", "Miasto", "Location", "City");
+  const locationMap     = extractLocationFromMarkdown(md);
+  const sellerKv        = fromKv(kv, "Sprzedający", "Informacje o sprzedającym", "Seller");
+  const sellerField     = field(md, "Sprzedający", "Informacje o sprzedającym", "Seller");
+  const sellerSection   = (() => {
     const m = md.match(/##\s*Informacje o sprzedającym\s*\n+([^\n*#|]{2,80})/i);
     return clean(m?.[1]);
   })();
-  const firstRegistrationKv = fromKv(kv, "Data pierwszej rejestracji w historii pojazdu", "Data pierwszej rejestracji", "Pierwsza rejestracja");
+  const firstRegistrationKv    = fromKv(kv, "Data pierwszej rejestracji w historii pojazdu", "Data pierwszej rejestracji", "Pierwsza rejestracja");
   const firstRegistrationField = field(md, "Data pierwszej rejestracji w historii pojazdu", "Data pierwszej rejestracji", "Pierwsza rejestracja");
-  const countryOfOriginKv = fromKv(
-    kv,
-    "Kraj pochodzenia",
-    "Kraj pierwszej rejestracji",
-    "Miejsce pierwszej rejestracji",
-    "Pochodzenie",
-    "Country of origin",
-  );
-  const countryOfOriginField = field(
-    md,
-    "Kraj pochodzenia",
-    "Kraj pierwszej rejestracji",
-    "Miejsce pierwszej rejestracji",
-    "Pochodzenie",
-    "Country of origin",
-  );
+  const countryOfOriginKv      = fromKv(kv, "Kraj pochodzenia", "Kraj pierwszej rejestracji", "Miejsce pierwszej rejestracji", "Pochodzenie", "Country of origin");
+  const countryOfOriginField   = field(md, "Kraj pochodzenia", "Kraj pierwszej rejestracji", "Miejsce pierwszej rejestracji", "Pochodzenie", "Country of origin");
 
   return {
     brand, model, variant,
+    generation,   // ← NEW: "E46 (1998-2006)" style string from otomoto
     year,
     price, currency,
     mileage: extractMileage(md, kv),
@@ -441,9 +474,10 @@ export function parseMd(md, url) {
       source: "jina-markdown",
       mdLength: md.length,
       qualityHints: {
-        hasNapedWord: /nap[ęe]d/i.test(md),
-        hasRejestrWord: /rejestracyj/i.test(md),
-        hasMapWord: /znajd[źz] na mapie|krak[óo]w/i.test(md),
+        hasNapedWord:    /nap[ęe]d/i.test(md),
+        hasRejestrWord:  /rejestracyj/i.test(md),
+        hasMapWord:      /znajd[źz] na mapie|krak[óo]w/i.test(md),
+        hasGeneracja:    /generacja/i.test(md),
       },
       kvKeysSample: Object.keys(kv).slice(0, 80),
     },
