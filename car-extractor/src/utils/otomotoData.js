@@ -334,3 +334,84 @@ export function buildOtomotoUrl({ brand, model, bodyType, gearbox, fuelType,
   const qs = qp.toString();
   return qs ? `${path}?${qs}` : path;
 }
+
+/* ──────────────────────────────────────────────────────────
+   OLX SUPPORT
+   ────────────────────────────────────────────────────────── */
+
+/**
+ * OLX brand slugs that differ from Otomoto slugs.
+ * For brands not listed here, the Otomoto slug is used directly.
+ */
+const OLX_BRAND_SLUG_OVERRIDES = {
+  "ds-automobiles": "ds",
+};
+
+export function getOlxBrandSlug(otomotoSlug) {
+  return OLX_BRAND_SLUG_OVERRIDES[otomotoSlug] ?? otomotoSlug;
+}
+
+/**
+ * Build an olx.pl search URL.
+ *
+ * OLX uses query params for model filtering (not URL path segments):
+ *   search[filter_enum_model][0]=z4
+ *
+ * Engine power param on OLX:
+ *   search[filter_float_enginepower:from]=175   (no underscore, unlike Otomoto)
+ *
+ * Example:
+ *   https://www.olx.pl/motoryzacja/samochody/bmw/
+ *     ?search[filter_enum_model][0]=z4
+ *     &search[filter_float_price:to]=50000
+ *     &search[filter_float_enginepower:from]=175
+ */
+export function buildOlxUrl({
+  brand, model,
+  priceFrom, priceTo,
+  yearFrom, yearTo,
+  mileageFrom, mileageTo,
+  powerFrom, powerTo,
+  gearbox, bodyType,
+}) {
+  if (!brand) return "";
+  const brandSlug = getOlxBrandSlug(brand);
+  const path = `https://www.olx.pl/motoryzacja/samochody/${brandSlug}/`;
+
+  const qp = new URLSearchParams();
+
+  // Model — OLX uses filter_enum_model as an array query param
+  if (model) qp.set("search[filter_enum_model][0]", model);
+
+  // Price
+  if (priceFrom)   qp.set("search[filter_float_price:from]",       priceFrom);
+  if (priceTo)     qp.set("search[filter_float_price:to]",         priceTo);
+
+  // Year
+  if (yearFrom)    qp.set("search[filter_float_year:from]",        yearFrom);
+  if (yearTo)      qp.set("search[filter_float_year:to]",          yearTo);
+
+  // Mileage
+  if (mileageFrom) qp.set("search[filter_float_mileage:from]",     mileageFrom);
+  if (mileageTo)   qp.set("search[filter_float_mileage:to]",       mileageTo);
+
+  // Engine power — OLX uses "enginepower" (no underscore), Otomoto uses "engine_power"
+  if (powerFrom)   qp.set("search[filter_float_enginepower:from]", powerFrom);
+  if (powerTo)     qp.set("search[filter_float_enginepower:to]",   powerTo);
+
+  // Gearbox — OLX uses "gearbox" (no underscore), Otomoto uses "gearbox"
+  if (gearbox)     qp.set("search[filter_enum_transmission]", gearbox);
+
+  // Car body type — OLX uses "body_type" (no underscore), Otomoto uses "body_type"
+  if (bodyType) qp.set("search[filter_enum_car_body][0]", bodyType);
+  
+
+  const qs = qp.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+export const PORTALS = [
+  { value: "otomoto", label: "Otomoto"     },
+  { value: "olx",     label: "OLX"         },
+  { value: "both",    label: "Oba portale" },
+];

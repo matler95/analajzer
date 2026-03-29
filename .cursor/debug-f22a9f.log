@@ -1,1 +1,2 @@
 {"sessionId": "f22a9f", "location": "backend/app/routers/auth.py:login", "message": "entered /auth/login handler", "hypothesisId": "BH1", "timestamp": 1774465966011, "data": {"emailPresent": true}}
+{"sessionId": "f22a9f", "location": "backend/app/routers/auth.py:login", "message": "entered /auth/login handler", "hypothesisId": "BH1", "timestamp": 1774812763310, "data": {"emailPresent": true}}

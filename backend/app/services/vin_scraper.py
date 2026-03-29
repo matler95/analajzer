@@ -139,21 +139,67 @@ async def check_and_login_session():
         print(f"[+] Znaleziono sesję otomoto na starcie: {AUTH_FILE}")
 
 
+# ---------------------------------------------------------------------------
+# JS selector patterns for extracting listing URLs from search results pages.
+# Covers both Otomoto and OLX link structures.
+# ---------------------------------------------------------------------------
+_JS_EXTRACT_URLS = """() => {
+    const seen = new Set();
+    const result = [];
+    const anchors = document.querySelectorAll('a[href]');
+
+    // Otomoto listing URL patterns
+    const otomotoPatterns = [
+        '/osobowe/oferta/',
+        '/ciezarowe-dostawcze/oferta/',
+        '/motocykle-quady/oferta/',
+        '/osobowe-inne/oferta/',
+    ];
+
+    // OLX listing URL patterns
+    // OLX listings look like: /d/oferta/[slug]-IDxxxxxxx.html
+    const olxPatterns = [
+        '/d/oferta/',
+    ];
+
+    anchors.forEach(a => {
+        const href = a.href || '';
+        const isOtomoto = otomotoPatterns.some(p => href.includes(p));
+        const isOlx     = href.includes('olx.pl') && olxPatterns.some(p => href.includes(p));
+        if (isOtomoto || isOlx) {
+            const clean = href.split('?')[0].split('#')[0];
+            if (clean && !seen.has(clean)) {
+                seen.add(clean);
+                result.push(clean);
+            }
+        }
+    });
+    return result;
+}"""
+
+
 def _get_search_listing_urls_sync(search_url: str, max_pages: int = 2) -> list[str]:
-    """Scrapes listing URLs from an otomoto search results page using Playwright."""
+    """Scrapes listing URLs from an otomoto.pl or olx.pl search results page using Playwright."""
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-    if not os.path.exists(AUTH_FILE):
+    is_otomoto = "otomoto.pl" in search_url
+    is_olx     = "olx.pl"     in search_url
+
+    # Only use saved Otomoto session for Otomoto; OLX is scraped anonymously
+    use_session = is_otomoto and os.path.exists(AUTH_FILE)
+
+    if is_otomoto and not os.path.exists(AUTH_FILE):
         print(f"[-] Brak pliku sesji. Uruchamiam logowanie...")
         login_and_save_state_sync()
+        use_session = os.path.exists(AUTH_FILE)
 
     all_urls: list[str] = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            storage_state=AUTH_FILE if os.path.exists(AUTH_FILE) else None,
+            storage_state=AUTH_FILE if use_session else None,
             user_agent=USER_AGENT,
             viewport={"width": 1920, "height": 1080},
         )
@@ -167,49 +213,32 @@ def _get_search_listing_urls_sync(search_url: str, max_pages: int = 2) -> list[s
                 page.goto(current_url, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(random.uniform(2, 4))
 
-                # Handle cookie banner
+                # Handle cookie banners (Otomoto + OLX)
                 try:
                     cookie_btn = page.locator("#onetrust-accept-btn-handler")
                     if cookie_btn.is_visible(timeout=2000):
                         cookie_btn.click()
+                    else:
+                        # OLX uses a different consent button
+                        olx_consent = page.locator("[data-testid='gdpr-consent-accept']")
+                        if olx_consent.is_visible(timeout=1000):
+                            olx_consent.click()
                 except Exception:
                     pass
 
-                # Extract listing URLs via JS evaluation
-                page_urls: list[str] = page.evaluate("""() => {
-                    const seen = new Set();
-                    const result = [];
-                    const anchors = document.querySelectorAll('a[href]');
-                    const patterns = [
-                        '/osobowe/oferta/',
-                        '/ciezarowe-dostawcze/oferta/',
-                        '/motocykle-quady/oferta/',
-                        '/osobowe-inne/oferta/'
-                    ];
-                    anchors.forEach(a => {
-                        const href = a.href || '';
-                        if (patterns.some(p => href.includes(p))) {
-                            const clean = href.split('?')[0].split('#')[0];
-                            if (clean && !seen.has(clean)) {
-                                seen.add(clean);
-                                result.push(clean);
-                            }
-                        }
-                    });
-                    return result;
-                }""")
-
+                page_urls: list[str] = page.evaluate(_JS_EXTRACT_URLS)
                 all_urls.extend(page_urls)
                 print(f"[+] Strona {page_num + 1}: znaleziono {len(page_urls)} ogłoszeń")
 
                 if page_num < max_pages - 1:
-                    # Try to find and navigate to next page
+                    # Otomoto uses data-testid pagination; OLX uses standard rel=next / page param
                     next_href: str | None = page.evaluate("""() => {
                         const selectors = [
                             '[data-testid="pagination-step-forwards"]',
                             'a[aria-label="Next page"]',
                             'li.pagination-item--next a',
-                            'a[rel="next"]'
+                            'a[rel="next"]',
+                            '[data-cy="pagination-forward"]',
                         ];
                         for (const sel of selectors) {
                             const el = document.querySelector(sel);
