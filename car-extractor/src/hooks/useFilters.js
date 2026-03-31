@@ -10,6 +10,7 @@ function loadFilters() {
     // Migrate old v1 filters that had maxPages
     return parsed.map(f => {
       const { maxPages, ...rest } = f;
+      if (!rest.portal) rest.portal = "otomoto";
       return rest;
     });
   } catch {
@@ -32,6 +33,7 @@ export function useFilters() {
     const newFilter = {
       id: `f_${Date.now()}`,
       name: data.name?.trim() || "Filtr bez nazwy",
+      portal: data.portal || "otomoto",
       vehicles: data.vehicles || [],
       params: data.params || {},
       searchUrls: data.searchUrls || (data.searchUrl ? [data.searchUrl] : []),

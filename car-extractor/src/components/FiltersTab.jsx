@@ -118,8 +118,8 @@ function PortalToggle({ value, onChange }) {
             onClick={() => onChange(p.value)}
           >
             {p.value === "otomoto" && <span className="ft-portal-dot ft-portal-dot--otomoto" />}
-            {p.value === "olx"     && <span className="ft-portal-dot ft-portal-dot--olx" />}
-            {p.value === "both"    && (
+            {p.value === "olx" && <span className="ft-portal-dot ft-portal-dot--olx" />}
+            {p.value === "both" && (
               <>
                 <span className="ft-portal-dot ft-portal-dot--otomoto" />
                 <span className="ft-portal-dot ft-portal-dot--olx" />
@@ -216,13 +216,13 @@ function AddFilterForm({ onAdd, onClose }) {
   // Filter UNIFIED_BODY_TYPES to only show options supported by the selected portal
   const availableBodyTypes = UNIFIED_BODY_TYPES.filter(b => {
     if (portal === "otomoto") return b.otoSlug !== null;
-    if (portal === "olx")     return b.olxSlug !== null;
+    if (portal === "olx") return b.olxSlug !== null;
     return true; // both — show all, unsupported side is silently skipped
   });
 
   const availableFuelTypes = UNIFIED_FUEL_TYPES.filter(f => {
     if (portal === "otomoto") return f.otoSlug !== null;
-    if (portal === "olx")     return f.olxSlug !== null;
+    if (portal === "olx") return f.olxSlug !== null;
     return true;
   });
 
@@ -327,10 +327,10 @@ function AddFilterForm({ onAdd, onClose }) {
         </div>
 
         {/* Ranges — all portals */}
-        <RangeField label="Rok produkcji" keyFrom="yearFrom"    keyTo="yearTo"    values={params} onChange={setParam} />
-        <RangeField label="Cena" unit="PLN" keyFrom="priceFrom" keyTo="priceTo"   values={params} onChange={setParam} />
+        <RangeField label="Rok produkcji" keyFrom="yearFrom" keyTo="yearTo" values={params} onChange={setParam} />
+        <RangeField label="Cena" unit="PLN" keyFrom="priceFrom" keyTo="priceTo" values={params} onChange={setParam} />
         <RangeField label="Przebieg" unit="km" keyFrom="mileageFrom" keyTo="mileageTo" values={params} onChange={setParam} />
-        <RangeField label="Moc" unit="KM"   keyFrom="powerFrom" keyTo="powerTo"   values={params} onChange={setParam} />
+        <RangeField label="Moc" unit="KM" keyFrom="powerFrom" keyTo="powerTo" values={params} onChange={setParam} />
       </div>
 
       {/* URL preview */}
@@ -384,7 +384,7 @@ function FilterCard({ filter, isJobRunning, isThisRunning, onRun, onRemove }) {
       return filter.vehicles.map(v => {
         const brand = OTOMOTO_BRANDS.find(b => b.slug === v.brand);
         const models = getModelsForBrand(v.brand);
-        const model  = models.find(m => m.slug === v.model);
+        const model = models.find(m => m.slug === v.model);
         const bLabel = brand?.label ?? v.brand ?? "?";
         const mLabel = model?.label ?? v.model ?? "";
         return mLabel ? `${bLabel} ${mLabel}` : bLabel;
@@ -414,14 +414,14 @@ function FilterCard({ filter, isJobRunning, isThisRunning, onRun, onRemove }) {
     return parts.length > 0 ? parts.join(" · ") : null;
   }, [filter.params]);
 
-  const urlCount    = filter.searchUrls?.length ?? 1;
+  const urlCount = filter.searchUrls?.length ?? 1;
   const portalLabel = filter.portal === "both" ? "OTO + OLX"
-                    : filter.portal === "olx"   ? "OLX"
-                    : filter.portal === "otomoto"   ? "Otomoto"
-                    : "błąd";
-  const portalCls   = filter.portal === "both" ? "ft-portal-tag--both"
-                    : filter.portal === "olx"   ? "ft-portal-tag--olx"
-                    : "ft-portal-tag--otomoto";
+    : filter.portal === "olx" ? "OLX"
+      : filter.portal === "otomoto" ? "Otomoto"
+        : "błąd";
+  const portalCls = filter.portal === "both" ? "ft-portal-tag--both"
+    : filter.portal === "olx" ? "ft-portal-tag--olx"
+      : "ft-portal-tag--otomoto";
 
   return (
     <div className={`filter-card ${isThisRunning ? "filter-card--running" : ""}`}>
