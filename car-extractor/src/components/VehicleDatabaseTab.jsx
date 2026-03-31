@@ -77,6 +77,32 @@ function fmt(n) {
   return Number(n).toLocaleString("pl-PL");
 }
 
+/**
+ * Extract a stable image fingerprint from an OLX/Otomoto CDN URL.
+ * Strips scaling suffixes like ";s=1000x800" or "?w=1024" so the same
+ * photo resolves to the same key regardless of portal or resize params.
+ */
+function getImgFingerprint(imgUrl) {
+  if (!imgUrl) return null;
+  try {
+    // Remove query string
+    let u = imgUrl.split("?")[0];
+    // Remove OLX semicolon scaling suffix (;s=WxH)
+    u = u.split(";")[0];
+    // Normalize trailing slash
+    u = u.replace(/\/+$/, "");
+    // Extract just the path segment that carries the photo ID
+    // apollo.olxcdn.com uses patterns like /images/<uuid>/<filename>
+    const m = u.match(/\/([a-f0-9\-]{30,}(?:\/[^/]+)?)$/);
+    if (m) return m[1].toLowerCase();
+    // Fallback: last two path segments
+    const parts = u.split("/").filter(Boolean);
+    return parts.slice(-2).join("/").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    STATUS BADGE
    ═══════════════════════════════════════════════════════════ */
@@ -183,11 +209,21 @@ function InlineField({ label, value, fieldKey, onSave }) {
    VEHICLE CARD — the core row component
    ═══════════════════════════════════════════════════════════ */
 
-function VehicleCard({ row, onOpen, onDelete, onPatch, onVerify, stats, verifyBusy }) {
+function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stats, verifyBusy }) {
   const [expanded, setExpanded] = useState(false);
   const [delConfirm, setDelConfirm] = useState(false);
 
   const snap        = row.snapshot_json || {};
+  const url         = row.listing_url || snap.listingUrl || "";
+  const isOlx       = url.includes("olx.pl");
+
+  // Determine portal badge taking duplicates into account
+  const hasOto = !isOlx || dups.some(d => !(d.listing_url || d.snapshot_json?.listingUrl || "").includes("olx.pl"));
+  const hasOlx = isOlx  || dups.some(d =>  (d.listing_url || d.snapshot_json?.listingUrl || "").includes("olx.pl"));
+  const isBoth      = hasOto && hasOlx;
+  const portalLabel = isBoth ? "OTO + OLX" : isOlx ? "OLX" : "Otomoto";
+  const portalCls   = isBoth ? "ft-portal-tag--both" : isOlx ? "ft-portal-tag--olx" : "ft-portal-tag--otomoto";
+
   const img         = snap.images?.[0];
   const title       = [snap.brand, snap.model].filter(Boolean).join(" ") || "Pojazd";
   const cepikStatus = getCepikStatus(row);
@@ -276,6 +312,7 @@ function VehicleCard({ row, onOpen, onDelete, onPatch, onVerify, stats, verifyBu
             {dealBadge && (
               <span className={`vdbc-deal ${dealBadge.cls}`}>{dealBadge.icon} {dealBadge.label}</span>
             )}
+            <span className={`ft-portal-tag ${portalCls}`}>{portalLabel}</span>
           </div>
         </div>
 
@@ -428,6 +465,44 @@ function VehicleCard({ row, onOpen, onDelete, onPatch, onVerify, stats, verifyBu
               {snap.location && <span>📍 {snap.location}</span>}
             </div>
           )}
+
+          {/* Cross-portal duplicate links */}
+          {dups.length > 0 && (
+            <div className="vdbc-dup-section">
+              <div className="vdbc-dup-title">Ogłoszenia na innych portalach</div>
+              <div className="vdbc-dup-links">
+                {/* Primary listing link */}
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`vdbc-dup-link ${isOlx ? "vdbc-dup-link--olx" : "vdbc-dup-link--oto"}`}
+                >
+                  <span className="vdbc-dup-link-dot" />
+                  {isOlx ? "OLX" : "Otomoto"}
+                  <span className="vdbc-dup-link-arr">↗</span>
+                </a>
+                {/* Duplicate links */}
+                {dups.map(dup => {
+                  const dupUrl = dup.listing_url || dup.snapshot_json?.listingUrl || "";
+                  const dupOlx = dupUrl.includes("olx.pl");
+                  return (
+                    <a
+                      key={dup.id}
+                      href={dupUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`vdbc-dup-link ${dupOlx ? "vdbc-dup-link--olx" : "vdbc-dup-link--oto"}`}
+                    >
+                      <span className="vdbc-dup-link-dot" />
+                      {dupOlx ? "OLX" : "Otomoto"}
+                      <span className="vdbc-dup-link-arr">↗</span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -485,6 +560,47 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
   const displayName = groupKey === "__manual" ? "Ręczne wyszukiwanie"
     : groupKey === "__none" ? "Bez filtru" : groupKey;
 
+  /**
+   * Deduplicate by first-image fingerprint.
+   * Primary = row with most data (verified > has VIN > otomoto > olx > created earlier).
+   * Returns array of { primary, dups[] }.
+   */
+  const dedupedItems = useMemo(() => {
+    const fpMap = new Map(); // fingerprint -> [rows]
+    const noFp  = [];        // rows without a first image
+
+    for (const row of items) {
+      const fp = getImgFingerprint(row.snapshot_json?.images?.[0]);
+      if (!fp) { noFp.push(row); continue; }
+      if (!fpMap.has(fp)) fpMap.set(fp, []);
+      fpMap.get(fp).push(row);
+    }
+
+    const scored = (row) => {
+      let s = 0;
+      if (row.verification?.ok_count > 0)               s += 1000;
+      const snap = row.snapshot_json || {};
+      const vin  = row.manual_vin || snap.vin;
+      if (vin)                                           s += 100;
+      const url  = row.listing_url || snap.listingUrl || "";
+      if (!url.includes("olx.pl"))                       s += 10;  // prefer otomoto (has more data)
+      return s;
+    };
+
+    const result = [];
+    for (const [, rows] of fpMap) {
+      if (rows.length === 1) {
+        result.push({ primary: rows[0], dups: [] });
+      } else {
+        const sorted = [...rows].sort((a, b) => scored(b) - scored(a));
+        result.push({ primary: sorted[0], dups: sorted.slice(1) });
+      }
+    }
+    for (const row of noFp) result.push({ primary: row, dups: [] });
+
+    return result;
+  }, [items]);
+
   return (
     <div className={`vdb-group ${collapsed ? "vdb-group--collapsed" : ""}`}>
       <div className="vdb-group-hdr" onClick={() => setCollapsed(v => !v)}>
@@ -509,16 +625,17 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
         <>
           <GroupStats stats={stats} filter={filter} />
           <div className="vdb-card-list">
-            {items.map(row => (
+            {dedupedItems.map(({ primary, dups: dupRows }) => (
               <VehicleCard
-                key={row.id}
-                row={row}
+                key={primary.id}
+                row={primary}
+                dups={dupRows}
                 onOpen={onOpen}
                 onDelete={onDelete}
                 onPatch={onPatch}
                 onVerify={onVerify}
                 stats={stats}
-                verifyBusy={verifyBusy[row.id]}
+                verifyBusy={verifyBusy[primary.id]}
               />
             ))}
           </div>
