@@ -2191,6 +2191,7 @@ body {
 
 .bgjob-stat-skip { color: var(--sub); }
 .bgjob-stat-cepik { color: var(--green); }
+.bgjob-stat-new   { color: var(--green); font-weight: 600; }
 
 .bgjob-current {
   font-family: var(--ff-m);

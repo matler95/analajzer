@@ -52,20 +52,12 @@ export async function apiFetch(path, opts = {}) {
   if (access) headers.Authorization = `Bearer ${access}`;
 
   let res;
-  try {
-    res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
-  } catch (e) {
-    throw e;
-  }
+  res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
   if (res.status === 401 && getTokens().refresh) {
     const newA = await refreshAccess();
     if (newA) {
       headers.Authorization = `Bearer ${newA}`;
-      try {
-        res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
-      } catch (e) {
-        throw e;
-      }
+      res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
     }
   }
   return res;
