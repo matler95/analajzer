@@ -1,11 +1,16 @@
 import { useState, useCallback, useMemo } from "react";
 import {
-  OTOMOTO_BRANDS, BODY_TYPES, GEARBOX_TYPES, FUEL_TYPES,
-  getModelsForBrand, buildOtomotoUrl,
-  buildOlxUrl, PORTALS,
+  OTOMOTO_BRANDS,
+  getModelsForBrand,
+  PORTALS,
+  UNIFIED_BODY_TYPES,
+  UNIFIED_FUEL_TYPES,
+  UNIFIED_GEARBOX_TYPES,
+  buildOlxUrl,
+  buildOtomotoUrlFull,
 } from "../utils/otomotoData.js";
 
-/* ─── helpers ─────────────────────────────────────────────── */
+/* ─── helpers ──────────────────────────────────────────────── */
 function formatDate(iso) {
   if (!iso) return null;
   try {
@@ -124,15 +129,11 @@ function PortalToggle({ value, onChange }) {
           </button>
         ))}
       </div>
-      {value === "olx" && (
-        <div className="ft-portal-note">
-          Filtry nadwozia, skrzyni i paliwa nie są obsługiwane przez OLX — zostaną zignorowane przy budowaniu linku.
-        </div>
-      )}
       {value === "both" && (
         <div className="ft-portal-note ft-portal-note--info">
-          Skanowanie odbędzie się na obu portalach — każda marka generuje 2 adresy URL.
-          Filtry nadwozia/skrzyni/paliwa dotyczą wyłącznie Otomoto.
+          Każda marka generuje 2 adresy URL — po jednym na portal.
+          Filtry nadwozia/skrzyni/paliwa obsługiwane przez oba portale (z automatycznym mapowaniem).
+          Hybryda (non-plug-in) jest dostępna tylko na Otomoto.
         </div>
       )}
     </div>
@@ -164,22 +165,33 @@ function AddFilterForm({ onAdd, onClose }) {
     setParams(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  /** Build all search URLs based on portal selection + vehicles */
-  const buildAllUrls = useCallback(() => {
+  /** Build all search URLs based on portal selection */
+  const buildAllUrlEntries = useCallback(() => {
     const validVehicles = vehicles.filter(v => v.brand);
-    const urls = [];
+    const entries = [];
     for (const v of validVehicles) {
+      const commonParams = { ...params, brand: v.brand, model: v.model };
       if (portal === "otomoto" || portal === "both") {
-        urls.push({ url: buildOtomotoUrl({ ...params, brand: v.brand, model: v.model }), portal: "otomoto", brand: v.brand, model: v.model });
+        entries.push({
+          url: buildOtomotoUrlFull(commonParams),
+          portal: "otomoto",
+          brand: v.brand,
+          model: v.model,
+        });
       }
       if (portal === "olx" || portal === "both") {
-        urls.push({ url: buildOlxUrl({ ...params, brand: v.brand }), portal: "olx", brand: v.brand });
+        entries.push({
+          url: buildOlxUrl(commonParams),
+          portal: "olx",
+          brand: v.brand,
+          model: v.model,
+        });
       }
     }
-    return urls;
+    return entries;
   }, [vehicles, params, portal]);
 
-  const previewUrls = useMemo(() => buildAllUrls(), [buildAllUrls]);
+  const previewEntries = useMemo(() => buildAllUrlEntries(), [buildAllUrlEntries]);
 
   const handleSubmit = () => {
     if (!name.trim()) { setErr("Podaj nazwę filtru"); return; }
@@ -187,7 +199,7 @@ function AddFilterForm({ onAdd, onClose }) {
     if (validVehicles.length === 0) { setErr("Wybierz co najmniej jedną markę"); return; }
     setErr(null);
 
-    const urlEntries = buildAllUrls();
+    const urlEntries = buildAllUrlEntries();
     const searchUrls = urlEntries.map(e => e.url);
 
     onAdd({
@@ -200,6 +212,19 @@ function AddFilterForm({ onAdd, onClose }) {
     });
     onClose();
   };
+
+  // Filter UNIFIED_BODY_TYPES to only show options supported by the selected portal
+  const availableBodyTypes = UNIFIED_BODY_TYPES.filter(b => {
+    if (portal === "otomoto") return b.otoSlug !== null;
+    if (portal === "olx")     return b.olxSlug !== null;
+    return true; // both — show all, unsupported side is silently skipped
+  });
+
+  const availableFuelTypes = UNIFIED_FUEL_TYPES.filter(f => {
+    if (portal === "otomoto") return f.otoSlug !== null;
+    if (portal === "olx")     return f.olxSlug !== null;
+    return true;
+  });
 
   return (
     <div className="ft-add-form">
@@ -218,13 +243,13 @@ function AddFilterForm({ onAdd, onClose }) {
         />
       </div>
 
-      {/* ── PORTAL ── */}
+      {/* Portal selector */}
       <PortalToggle value={portal} onChange={setPortal} />
 
-      {/* ── BRANDS & MODELS ── */}
+      {/* Brands & models */}
       <div className="ft-section-title">
         <span>Marki i modele</span>
-        <span className="ft-section-hint">Możesz wybrać wiele marek — każda będzie skanowana osobno</span>
+        <span className="ft-section-hint">Każda marka skanowana osobno</span>
       </div>
 
       <div className="ft-bm-list">
@@ -246,64 +271,82 @@ function AddFilterForm({ onAdd, onClose }) {
         </button>
       )}
 
-      {/* ── PARAMETERS ── */}
+      {/* Parameters */}
       <div className="ft-section-title" style={{ marginTop: 20 }}>
         <span>Parametry</span>
-        {portal !== "otomoto" && (
-          <span className="ft-section-hint">Filtry nadwozia/skrzyni/paliwa dotyczą tylko Otomoto</span>
-        )}
       </div>
 
       <div className="ft-params-grid">
 
-        {/* Dropdowns — Otomoto-only */}
-        {(portal === "otomoto" || portal === "both") && (
-          <>
-            <div className="ft-field">
-              <label className="ft-label">Typ nadwozia</label>
-              <select className="ft-select" value={params.bodyType} onChange={e => setParam("bodyType", e.target.value)}>
-                <option value="">— dowolny —</option>
-                {BODY_TYPES.map(b => <option key={b.slug} value={b.slug}>{b.label}</option>)}
-              </select>
-            </div>
+        {/* Shared selects */}
+        <div className="ft-field">
+          <label className="ft-label">Typ nadwozia</label>
+          <select
+            className="ft-select"
+            value={params.bodyType}
+            onChange={e => setParam("bodyType", e.target.value)}
+          >
+            <option value="">— dowolny —</option>
+            {availableBodyTypes.map(b => (
+              <option key={b.slug} value={b.slug}>{b.label}</option>
+            ))}
+          </select>
+        </div>
 
-            <div className="ft-field">
-              <label className="ft-label">Skrzynia biegów</label>
-              <select className="ft-select" value={params.gearbox} onChange={e => setParam("gearbox", e.target.value)}>
-                <option value="">— dowolna —</option>
-                {GEARBOX_TYPES.map(g => <option key={g.slug} value={g.slug}>{g.label}</option>)}
-              </select>
-            </div>
+        <div className="ft-field">
+          <label className="ft-label">Skrzynia biegów</label>
+          <select
+            className="ft-select"
+            value={params.gearbox}
+            onChange={e => setParam("gearbox", e.target.value)}
+          >
+            <option value="">— dowolna —</option>
+            {UNIFIED_GEARBOX_TYPES.map(g => (
+              <option key={g.slug} value={g.slug}>{g.label}</option>
+            ))}
+          </select>
+        </div>
 
-            <div className="ft-field">
-              <label className="ft-label">Rodzaj paliwa</label>
-              <select className="ft-select" value={params.fuelType} onChange={e => setParam("fuelType", e.target.value)}>
-                <option value="">— dowolny —</option>
-                {FUEL_TYPES.map(f => <option key={f.slug} value={f.slug}>{f.label}</option>)}
-              </select>
-            </div>
-          </>
-        )}
+        <div className="ft-field">
+          <label className="ft-label">
+            Rodzaj paliwa
+            {portal === "both" && params.fuelType === "hybrid" && (
+              <span className="ft-field-note"> (tylko Otomoto)</span>
+            )}
+          </label>
+          <select
+            className="ft-select"
+            value={params.fuelType}
+            onChange={e => setParam("fuelType", e.target.value)}
+          >
+            <option value="">— dowolny —</option>
+            {availableFuelTypes.map(f => (
+              <option key={f.slug} value={f.slug}>{f.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Ranges — all portals */}
-        <RangeField label="Rok produkcji" keyFrom="yearFrom" keyTo="yearTo" values={params} onChange={setParam} />
-        <RangeField label="Cena" unit="PLN" keyFrom="priceFrom" keyTo="priceTo" values={params} onChange={setParam} />
+        <RangeField label="Rok produkcji" keyFrom="yearFrom"    keyTo="yearTo"    values={params} onChange={setParam} />
+        <RangeField label="Cena" unit="PLN" keyFrom="priceFrom" keyTo="priceTo"   values={params} onChange={setParam} />
         <RangeField label="Przebieg" unit="km" keyFrom="mileageFrom" keyTo="mileageTo" values={params} onChange={setParam} />
-        <RangeField label="Moc" unit="KM" keyFrom="powerFrom" keyTo="powerTo" values={params} onChange={setParam} />
+        <RangeField label="Moc" unit="KM"   keyFrom="powerFrom" keyTo="powerTo"   values={params} onChange={setParam} />
       </div>
 
-      {/* Preview URLs */}
-      {previewUrls.length > 0 && (
+      {/* URL preview */}
+      {previewEntries.length > 0 && (
         <div className="ft-preview">
           <div className="ft-preview-title">
-            Podgląd adresów URL ({previewUrls.length})
+            Podgląd adresów URL ({previewEntries.length})
           </div>
-          {previewUrls.map((entry, i) => (
+          {previewEntries.map((entry, i) => (
             <div key={i} className="ft-preview-url">
               <span className={`ft-preview-portal-badge ft-preview-portal-badge--${entry.portal}`}>
                 {entry.portal === "otomoto" ? "OTO" : "OLX"}
               </span>
-              <a href={entry.url} target="_blank" rel="noreferrer" className="ft-preview-link">{entry.url}</a>
+              <a href={entry.url} target="_blank" rel="noreferrer" className="ft-preview-link">
+                {entry.url}
+              </a>
             </div>
           ))}
         </div>
@@ -341,10 +384,10 @@ function FilterCard({ filter, isJobRunning, isThisRunning, onRun, onRemove }) {
       return filter.vehicles.map(v => {
         const brand = OTOMOTO_BRANDS.find(b => b.slug === v.brand);
         const models = getModelsForBrand(v.brand);
-        const model = models.find(m => m.slug === v.model);
-        const brandLabel = brand?.label ?? v.brand ?? "?";
-        const modelLabel = model?.label ?? v.model ?? "";
-        return modelLabel ? `${brandLabel} ${modelLabel}` : brandLabel;
+        const model  = models.find(m => m.slug === v.model);
+        const bLabel = brand?.label ?? v.brand ?? "?";
+        const mLabel = model?.label ?? v.model ?? "";
+        return mLabel ? `${bLabel} ${mLabel}` : bLabel;
       }).join(" + ");
     }
     return filter.searchUrl || "Brak URL";
@@ -354,21 +397,30 @@ function FilterCard({ filter, isJobRunning, isThisRunning, onRun, onRemove }) {
     if (!filter.params) return null;
     const p = filter.params;
     const parts = [];
-    if (p.yearFrom || p.yearTo) parts.push(`${p.yearFrom || "?"}–${p.yearTo || "?"}`);
-    if (p.priceFrom || p.priceTo) parts.push(`${p.priceFrom ? Number(p.priceFrom).toLocaleString("pl-PL") : "?"}–${p.priceTo ? Number(p.priceTo).toLocaleString("pl-PL") : "?"} PLN`);
-    if (p.mileageTo) parts.push(`do ${Number(p.mileageTo).toLocaleString("pl-PL")} km`);
-    if (p.gearbox) parts.push(GEARBOX_TYPES.find(g => g.slug === p.gearbox)?.label ?? p.gearbox);
-    if (p.fuelType) parts.push(FUEL_TYPES.find(f => f.slug === p.fuelType)?.label ?? p.fuelType);
-    if (p.bodyType) parts.push(BODY_TYPES.find(b => b.slug === p.bodyType)?.label ?? p.bodyType);
+    if (p.yearFrom || p.yearTo)
+      parts.push(`${p.yearFrom || "?"}–${p.yearTo || "?"}`);
+    if (p.priceFrom || p.priceTo)
+      parts.push(`${p.priceFrom ? Number(p.priceFrom).toLocaleString("pl-PL") : "?"}–${p.priceTo ? Number(p.priceTo).toLocaleString("pl-PL") : "?"} PLN`);
+    if (p.mileageTo)
+      parts.push(`do ${Number(p.mileageTo).toLocaleString("pl-PL")} km`);
+    if (p.gearbox)
+      parts.push(UNIFIED_GEARBOX_TYPES.find(g => g.slug === p.gearbox)?.label ?? p.gearbox);
+    if (p.fuelType)
+      parts.push(UNIFIED_FUEL_TYPES.find(f => f.slug === p.fuelType)?.label ?? p.fuelType);
+    if (p.bodyType)
+      parts.push(UNIFIED_BODY_TYPES.find(b => b.slug === p.bodyType)?.label ?? p.bodyType);
+    if (p.powerFrom || p.powerTo)
+      parts.push(`${p.powerFrom || "?"}–${p.powerTo || "?"} KM`);
     return parts.length > 0 ? parts.join(" · ") : null;
   }, [filter.params]);
 
-  const urlCount = filter.searchUrls?.length ?? 1;
-  const portalLabel = filter.portal === "both"    ? "OTO + OLX"
-                    : filter.portal === "olx"      ? "OLX"
-                    : "Otomoto";
-  const portalCls   = filter.portal === "both"    ? "ft-portal-tag--both"
-                    : filter.portal === "olx"      ? "ft-portal-tag--olx"
+  const urlCount    = filter.searchUrls?.length ?? 1;
+  const portalLabel = filter.portal === "both" ? "OTO + OLX"
+                    : filter.portal === "olx"   ? "OLX"
+                    : filter.portal === "otomoto"   ? "Otomoto"
+                    : "błąd";
+  const portalCls   = filter.portal === "both" ? "ft-portal-tag--both"
+                    : filter.portal === "olx"   ? "ft-portal-tag--olx"
                     : "ft-portal-tag--otomoto";
 
   return (
@@ -415,9 +467,9 @@ function FilterCard({ filter, isJobRunning, isThisRunning, onRun, onRemove }) {
           disabled={isJobRunning || (!filter.searchUrl && !filter.searchUrls?.length)}
           title={isJobRunning ? "Inne zadanie jest w toku" : "Uruchom skanowanie"}
         >
-          {isThisRunning ? (
-            <span className="filter-run-spinner" aria-hidden="true" />
-          ) : "▶"}
+          {isThisRunning
+            ? <span className="filter-run-spinner" aria-hidden="true" />
+            : "▶"}
           <span>{isThisRunning ? "W toku…" : "Uruchom"}</span>
         </button>
 
@@ -434,8 +486,10 @@ function FilterCard({ filter, isJobRunning, isThisRunning, onRun, onRemove }) {
   );
 }
 
-/* ─── FiltersTab (main export) ─────────────────────────────── */
-export default function FiltersTab({ filters, isJobRunning, currentJobFilterId, onAdd, onRemove, onRun, me }) {
+/* ─── FiltersTab ────────────────────────────────────────────── */
+export default function FiltersTab({
+  filters, isJobRunning, currentJobFilterId, onAdd, onRemove, onRun, me,
+}) {
   const [showAddForm, setShowAddForm] = useState(false);
 
   return (
@@ -445,8 +499,8 @@ export default function FiltersTab({ filters, isJobRunning, currentJobFilterId, 
           <div>
             <div className="section-label">Filtry wyszukiwania</div>
             <div className="filters-tab-desc">
-              Skonfiguruj parametry wyszukiwania — aplikacja automatycznie zbuduje URL dla wybranego portalu,
-              przeskanuje ogłoszenia i opcjonalnie wykona weryfikację CEPiK.
+              Skonfiguruj parametry — aplikacja zbuduje URL dla Otomoto i/lub OLX,
+              przeskanuje ogłoszenia i wykona weryfikację CEPiK tam, gdzie dostępny VIN.
             </div>
           </div>
           {!showAddForm && (
@@ -494,10 +548,11 @@ export default function FiltersTab({ filters, isJobRunning, currentJobFilterId, 
         <div className="filter-info-title">Jak działa automatyczne skanowanie?</div>
         <ol className="filter-info-list">
           <li>Aplikacja buduje URL dla wybranego portalu (Otomoto, OLX lub obu).</li>
+          <li>Filtry są automatycznie tłumaczone na odpowiednie parametry każdego portalu.</li>
           <li>Dla filtrów z wieloma markami — skanuje każdą markę osobno (po kolei).</li>
-          <li>Liczba stron jest ustalana automatycznie na podstawie liczby wyników.</li>
+          <li>Liczba stron jest ustalana automatycznie.</li>
           <li>Dla każdego ogłoszenia pobiera dane przez Jina AI i parsuje je.</li>
-          <li>Jeśli ogłoszenie na Otomoto zawiera VIN, przeprowadza weryfikację w CEPiK.</li>
+          <li>Jeśli ogłoszenie (Otomoto) zawiera VIN, przeprowadza weryfikację w CEPiK.</li>
           <li>Wyniki trafiają do zakładki „Baza pojazdów".</li>
         </ol>
       </div>

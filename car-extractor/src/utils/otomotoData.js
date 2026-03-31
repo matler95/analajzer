@@ -335,14 +335,21 @@ export function buildOtomotoUrl({ brand, model, bodyType, gearbox, fuelType,
   return qs ? `${path}?${qs}` : path;
 }
 
-/* ──────────────────────────────────────────────────────────
-   OLX SUPPORT
-   ────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   OLX SUPPORT — append to bottom of src/utils/otomotoData.js
+   ═══════════════════════════════════════════════════════════ */
 
-/**
- * OLX brand slugs that differ from Otomoto slugs.
- * For brands not listed here, the Otomoto slug is used directly.
- */
+// ─── Portal definitions ────────────────────────────────────
+
+export const PORTALS = [
+  { value: "otomoto", label: "Otomoto"     },
+  { value: "olx",     label: "OLX"         },
+  { value: "both",    label: "Oba portale" },
+];
+
+// ─── Brand slug overrides (Otomoto slug → OLX slug) ────────
+// Most brand slugs are identical; only exceptions listed here.
+
 const OLX_BRAND_SLUG_OVERRIDES = {
   "ds-automobiles": "ds",
 };
@@ -351,67 +358,230 @@ export function getOlxBrandSlug(otomotoSlug) {
   return OLX_BRAND_SLUG_OVERRIDES[otomotoSlug] ?? otomotoSlug;
 }
 
-/**
- * Build an olx.pl search URL.
- *
- * OLX uses query params for model filtering (not URL path segments):
- *   search[filter_enum_model][0]=z4
- *
- * Engine power param on OLX:
- *   search[filter_float_enginepower:from]=175   (no underscore, unlike Otomoto)
- *
- * Example:
- *   https://www.olx.pl/motoryzacja/samochody/bmw/
- *     ?search[filter_enum_model][0]=z4
- *     &search[filter_float_price:to]=50000
- *     &search[filter_float_enginepower:from]=175
- */
+// ─── OLX model slug map ─────────────────────────────────────
+//
+// OLX.pl uses a pan-European model database with Hungarian-style
+// suffixes for numbered series ("sorozat" = series in Hungarian).
+// Hungarian ordinal suffixes: 1→1-es, 2→2-es, 3→3-as, 4→4-es,
+//   5→5-os, 6→6-os, 7→7-es, 8→8-as
+//
+// Structure: { [brandSlug]: { [otomotoModelSlug]: olxModelSlug } }
+// Brands/models not listed fall back to the Otomoto slug as-is.
+
+const OLX_MODEL_SLUG_MAP = {
+  "bmw": {
+    "seria-1": "1-es-sorozat",
+    "seria-2": "2-es-sorozat",
+    "seria-3": "3-as-sorozat",   // confirmed
+    "seria-4": "4-es-sorozat",
+    "seria-5": "5-os-sorozat",
+    "seria-6": "6-os-sorozat",
+    "seria-7": "7-es-sorozat",
+    "seria-8": "8-as-sorozat",
+    // X / Z / M / i series — identical slugs on both portals
+  },
+  "mercedes-benz": {
+    "klasa-a": "a-osztaly",
+    "klasa-b": "b-osztaly",
+    "klasa-c": "c-osztaly",
+    "klasa-cl": "cl-osztaly",
+    "klasa-cla": "cla-osztaly",
+    "klasa-clk": "clk-osztaly",
+    "klasa-cls": "cls-osztaly",
+    "klasa-e": "e-osztaly",
+    "klasa-g": "g-osztaly",
+    "klasa-gl": "gl-osztaly",
+    "klasa-gla": "gla-osztaly",
+    "klasa-glb": "glb-osztaly",
+    "klasa-glc": "glc-osztaly",
+    "klasa-gle": "gle-osztaly",
+    "klasa-gls": "gls-osztaly",
+    "klasa-m": "m-osztaly",
+    "klasa-r": "r-osztaly",
+    "klasa-s": "s-osztaly",
+    "klasa-sl": "sl-osztaly",
+    "klasa-slk": "slk-osztaly",
+    "klasa-v": "v-osztaly",
+  },
+};
+
+export function getOlxModelSlug(brandSlug, otomotoModelSlug) {
+  if (!otomotoModelSlug) return "";
+  const brandMap = OLX_MODEL_SLUG_MAP[brandSlug];
+  if (brandMap && brandMap[otomotoModelSlug]) {
+    return brandMap[otomotoModelSlug];
+  }
+  // Default: use the Otomoto slug as-is (works for most brands)
+  return otomotoModelSlug;
+}
+
+// ─── Unified cross-portal filter options ───────────────────
+//
+// These replace BODY_TYPES, FUEL_TYPES, GEARBOX_TYPES in the app.
+// `slug`    = canonical value stored in filter config
+// `otoSlug` = Otomoto query param value  (null = not supported)
+// `olxSlug` = OLX query param value      (null = not supported)
+//
+// Body type notes:
+//   OLX values come from filter_enum_car_body
+//   Otomoto values come from filter_enum_body_type
+//   "Hatchback" maps to Otomoto "kompakt" (closest match)
+
+export const UNIFIED_BODY_TYPES = [
+  { label: "Sedan",      slug: "sedan",      otoSlug: "sedan",       olxSlug: "sedan"            },
+  { label: "Hatchback",  slug: "hatchback",  otoSlug: "kompakt",     olxSlug: "hatchback"        },
+  { label: "Kombi",      slug: "kombi",      otoSlug: "kombi",       olxSlug: "estate-car"       },
+  { label: "SUV",        slug: "suv",        otoSlug: "suv",         olxSlug: "suv"              },
+  { label: "Coupe",      slug: "coupe",      otoSlug: "coupe",       olxSlug: "coupe"            },
+  { label: "Kabriolet",  slug: "kabriolet",  otoSlug: "kabriolet",   olxSlug: "cabriolet"        },
+  { label: "Minivan",    slug: "minivan",    otoSlug: "minivan",     olxSlug: "mvp"              },
+  { label: "Pickup",     slug: "pickup",     otoSlug: null,          olxSlug: "pickup"           },
+  { label: "Terenowy",   slug: "terenowy",   otoSlug: null,          olxSlug: "off-road-vehicle" },
+  { label: "Minibus",    slug: "minibus",    otoSlug: null,          olxSlug: "minibus"          },
+];
+
+// Fuel type notes:
+//   OLX uses filter_enum_petrol
+//   Otomoto uses filter_enum_fuel_type
+//   "Hybryda" (non-plug-in) exists on Otomoto but not OLX
+
+export const UNIFIED_FUEL_TYPES = [
+  { label: "Benzyna",        slug: "petrol",        otoSlug: "petrol",        olxSlug: "petrol"        },
+  { label: "Diesel",         slug: "diesel",        otoSlug: "diesel",        olxSlug: "diesel"        },
+  { label: "Hybryda",        slug: "hybrid",        otoSlug: "hybrid",        olxSlug: null            },
+  { label: "Hybryda plug-in",slug: "plugin-hybrid", otoSlug: "plugin-hybrid", olxSlug: "plugin-hybrid" },
+  { label: "Elektryczny",    slug: "electric",      otoSlug: "electric",      olxSlug: "electric"      },
+  { label: "Benzyna+LPG",    slug: "petrol-lpg",    otoSlug: "petrol-lpg",    olxSlug: "lpg"           },
+  { label: "Benzyna+CNG",    slug: "petrol-cng",    otoSlug: "petrol-cng",    olxSlug: "cng"           },
+];
+
+// Gearbox: same slug values on both portals ("manual" / "automatic")
+// but different query param keys:
+//   Otomoto: filter_enum_gearbox       (single value, NOT array)
+//   OLX:     filter_enum_transmission  (array — [0]=value)
+// NOTE: Otomoto filter_enum_transmission = DRIVETRAIN (all-wheel etc.), not gearbox!
+
+export const UNIFIED_GEARBOX_TYPES = [
+  { label: "Manualna",     slug: "manual"    },
+  { label: "Automatyczna", slug: "automatic" },
+];
+
+// ─── OLX URL builder ───────────────────────────────────────
+
 export function buildOlxUrl({
   brand, model,
   priceFrom, priceTo,
   yearFrom, yearTo,
   mileageFrom, mileageTo,
   powerFrom, powerTo,
-  gearbox, bodyType,
+  fuelType,
+  bodyType,
+  gearbox,
 }) {
   if (!brand) return "";
+
   const brandSlug = getOlxBrandSlug(brand);
   const path = `https://www.olx.pl/motoryzacja/samochody/${brandSlug}/`;
-
   const qp = new URLSearchParams();
 
-  // Model — OLX uses filter_enum_model as an array query param
-  if (model) qp.set("search[filter_enum_model][0]", model);
+  // Model — OLX uses array query param, not URL path
+  if (model) {
+    const olxModel = getOlxModelSlug(brand, model);
+    if (olxModel) qp.set("search[filter_enum_model][0]", olxModel);
+  }
 
   // Price
-  if (priceFrom)   qp.set("search[filter_float_price:from]",       priceFrom);
-  if (priceTo)     qp.set("search[filter_float_price:to]",         priceTo);
+  if (priceFrom)   qp.set("search[filter_float_price:from]",        priceFrom);
+  if (priceTo)     qp.set("search[filter_float_price:to]",          priceTo);
 
-  // Year
-  if (yearFrom)    qp.set("search[filter_float_year:from]",        yearFrom);
-  if (yearTo)      qp.set("search[filter_float_year:to]",          yearTo);
+  // Year — both as query params on OLX
+  if (yearFrom)    qp.set("search[filter_float_year:from]",         yearFrom);
+  if (yearTo)      qp.set("search[filter_float_year:to]",           yearTo);
 
-  // Mileage
-  if (mileageFrom) qp.set("search[filter_float_mileage:from]",     mileageFrom);
-  if (mileageTo)   qp.set("search[filter_float_mileage:to]",       mileageTo);
+  // Engine power — "enginepower" without underscore
+  if (powerFrom)   qp.set("search[filter_float_enginepower:from]",  powerFrom);
+  if (powerTo)     qp.set("search[filter_float_enginepower:to]",    powerTo);
 
-  // Engine power — OLX uses "enginepower" (no underscore), Otomoto uses "engine_power"
-  if (powerFrom)   qp.set("search[filter_float_enginepower:from]", powerFrom);
-  if (powerTo)     qp.set("search[filter_float_enginepower:to]",   powerTo);
+  // Mileage — OLX typo: "milage" (one 'e') is intentional in their system
+  if (mileageFrom) qp.set("search[filter_float_milage:from]",       mileageFrom);
+  if (mileageTo)   qp.set("search[filter_float_milage:to]",         mileageTo);
 
-  // Gearbox — OLX uses "gearbox" (no underscore), Otomoto uses "gearbox"
-  if (gearbox)     qp.set("search[filter_enum_transmission]", gearbox);
+  // Fuel — filter_enum_petrol
+  if (fuelType) {
+    const olxFuel = UNIFIED_FUEL_TYPES.find(f => f.slug === fuelType)?.olxSlug;
+    if (olxFuel) qp.set("search[filter_enum_petrol][0]", olxFuel);
+  }
 
-  // Car body type — OLX uses "body_type" (no underscore), Otomoto uses "body_type"
-  if (bodyType) qp.set("search[filter_enum_car_body][0]", bodyType);
-  
+  // Body — filter_enum_car_body
+  if (bodyType) {
+    const olxBody = UNIFIED_BODY_TYPES.find(b => b.slug === bodyType)?.olxSlug;
+    if (olxBody) qp.set("search[filter_enum_car_body][0]", olxBody);
+  }
+
+  // Gearbox — filter_enum_transmission (array) — distinct from Otomoto's drivetrain!
+  if (gearbox) {
+    qp.set("search[filter_enum_transmission][0]", gearbox);
+  }
 
   const qs = qp.toString();
   return qs ? `${path}?${qs}` : path;
 }
 
-export const PORTALS = [
-  { value: "otomoto", label: "Otomoto"     },
-  { value: "olx",     label: "OLX"         },
-  { value: "both",    label: "Oba portale" },
-];
+// ─── Updated Otomoto URL builder ────────────────────────────
+//
+// Replaces the old buildOtomotoUrl exported from this file.
+// Key difference: yearFrom goes in the URL path as /od-{year}.
+
+export function buildOtomotoUrlFull({
+  brand, model,
+  priceFrom, priceTo,
+  yearFrom, yearTo,
+  mileageFrom, mileageTo,
+  powerFrom, powerTo,
+  fuelType,
+  bodyType,
+  gearbox,
+}) {
+  if (!brand) return "";
+
+  let path = `https://www.otomoto.pl/osobowe/${brand}`;
+  if (model)    path += `/${model}`;
+  if (yearFrom) path += `/od-${yearFrom}`;
+
+  const qp = new URLSearchParams();
+
+  // Price
+  if (priceFrom)   qp.set("search[filter_float_price:from]",        priceFrom);
+  if (priceTo)     qp.set("search[filter_float_price:to]",          priceTo);
+
+  // Year — only yearTo as query param (yearFrom is in path)
+  if (yearTo)      qp.set("search[filter_float_year:to]",           yearTo);
+
+  // Engine power — "engine_power" with underscore
+  if (powerFrom)   qp.set("search[filter_float_engine_power:from]", powerFrom);
+  if (powerTo)     qp.set("search[filter_float_engine_power:to]",   powerTo);
+
+  // Mileage — correct spelling with 'e'
+  if (mileageFrom) qp.set("search[filter_float_mileage:from]",      mileageFrom);
+  if (mileageTo)   qp.set("search[filter_float_mileage:to]",        mileageTo);
+
+  // Fuel — filter_enum_fuel_type[0]
+  if (fuelType) {
+    const otoFuel = UNIFIED_FUEL_TYPES.find(f => f.slug === fuelType)?.otoSlug;
+    if (otoFuel) qp.set("search[filter_enum_fuel_type][0]", otoFuel);
+  }
+
+  // Body — filter_enum_body_type[0]
+  if (bodyType) {
+    const otoBody = UNIFIED_BODY_TYPES.find(b => b.slug === bodyType)?.otoSlug;
+    if (otoBody) qp.set("search[filter_enum_body_type][0]", otoBody);
+  }
+
+  // Gearbox — filter_enum_gearbox (single value, NOT an array)
+  if (gearbox) {
+    qp.set("search[filter_enum_gearbox]", gearbox);
+  }
+
+  const qs = qp.toString();
+  return qs ? `${path}?${qs}` : path;
+}
