@@ -1,13 +1,30 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { apiFetch } from "../api.js";
 import {
   normalizeLicensePlate, normalizeVin, normalizeDateForCepik,
   isValidLicensePlate, isValidVin,
 } from "../utils/normalize.js";
+import UndoToast, { UNDO_DURATION_MS } from "./UndoToast.jsx";
+import DbStatsPanel from "./DbStatsPanel.jsx";
+import PriceSparkline from "./PriceSparkline.jsx";
+import BulkActionBar from "./BulkActionBar.jsx";
+import { useExport } from "../hooks/useExport.js";
 
 /* ═══════════════════════════════════════════════════════════
    HELPERS
    ═══════════════════════════════════════════════════════════ */
+
+const COLLAPSED_KEY = "analajzer_vdb_collapsed_v1";
+
+function loadCollapsedState() {
+  try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function saveCollapsedState(state) {
+  try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(state)); }
+  catch { /* ignore */ }
+}
 
 function getCepikStatus(row) {
   const ver = row.verification;
@@ -77,30 +94,17 @@ function fmt(n) {
   return Number(n).toLocaleString("pl-PL");
 }
 
-/**
- * Extract a stable image fingerprint from an OLX/Otomoto CDN URL.
- * Strips scaling suffixes like ";s=1000x800" or "?w=1024" so the same
- * photo resolves to the same key regardless of portal or resize params.
- */
 function getImgFingerprint(imgUrl) {
   if (!imgUrl) return null;
   try {
-    // Remove query string
     let u = imgUrl.split("?")[0];
-    // Remove OLX semicolon scaling suffix (;s=WxH)
     u = u.split(";")[0];
-    // Normalize trailing slash
     u = u.replace(/\/+$/, "");
-    // Extract just the path segment that carries the photo ID
-    // apollo.olxcdn.com uses patterns like /images/<uuid>/<filename>
     const m = u.match(/\/([a-f0-9\-]{30,}(?:\/[^/]+)?)$/);
     if (m) return m[1].toLowerCase();
-    // Fallback: last two path segments
     const parts = u.split("/").filter(Boolean);
     return parts.slice(-2).join("/").toLowerCase();
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -125,7 +129,7 @@ function StatusBadge({ status }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INLINE FIELD — stacked, full-width, clear edit UX
+   INLINE FIELD
    ═══════════════════════════════════════════════════════════ */
 
 function InlineField({ label, value, fieldKey, onSave }) {
@@ -152,11 +156,7 @@ function InlineField({ label, value, fieldKey, onSave }) {
   const displayVal   = value ? normalize(value) : null;
   const displayState = validate(displayVal || "");
 
-  const startEdit = () => {
-    setDraft(displayVal || "");
-    setErr(null);
-    setEditing(true);
-  };
+  const startEdit = () => { setDraft(displayVal || ""); setErr(null); setEditing(true); };
 
   const save = async () => {
     const n = normalize(draft);
@@ -206,10 +206,10 @@ function InlineField({ label, value, fieldKey, onSave }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   VEHICLE CARD — the core row component
+   VEHICLE CARD
    ═══════════════════════════════════════════════════════════ */
 
-function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stats, verifyBusy }) {
+function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stats, verifyBusy, pendingDelete, selected, onToggleSelect }) {
   const [expanded, setExpanded] = useState(false);
   const [delConfirm, setDelConfirm] = useState(false);
 
@@ -217,7 +217,6 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
   const url         = row.listing_url || snap.listingUrl || "";
   const isOlx       = url.includes("olx.pl");
 
-  // Determine portal badge taking duplicates into account
   const hasOto = !isOlx || dups.some(d => !(d.listing_url || d.snapshot_json?.listingUrl || "").includes("olx.pl"));
   const hasOlx = isOlx  || dups.some(d =>  (d.listing_url || d.snapshot_json?.listingUrl || "").includes("olx.pl"));
   const isBoth      = hasOto && hasOlx;
@@ -283,22 +282,34 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
       expanded    ? "vdbc--open"     : "",
       isArchived  ? "vdbc--archived" : "",
       isNew       ? "vdbc--new"      : "",
+      pendingDelete ? "vdbc--pending-delete" : "",
+      selected    ? "vdbc--selected" : "",
     ].filter(Boolean).join(" ")}>
 
-      {/* ── Card header ── */}
       <div className="vdbc-hdr" onClick={() => setExpanded(v => !v)} role="button" tabIndex={0}
         onKeyDown={e => e.key === "Enter" && setExpanded(v => !v)}>
 
-        {/* Thumbnail */}
+        {/* Selection checkbox — click stops propagation so it doesn't toggle expand */}
+        {onToggleSelect && (
+          <div
+            className="vdbc-checkbox-wrap"
+            onClick={e => { e.stopPropagation(); onToggleSelect(row.id); }}
+          >
+            <div className={`vdbc-checkbox ${selected ? "vdbc-checkbox--checked" : ""}`} aria-label={selected ? "Odznacz" : "Zaznacz"}>
+              {selected && <span aria-hidden="true">✓</span>}
+            </div>
+          </div>
+        )}
+
         <div className="vdbc-thumb">
           {img
             ? <img src={img} alt="" className="vdbc-img" loading="lazy" />
             : <div className="vdbc-img-empty">VX</div>}
           {isNew      && <span className="vdbc-flag vdbc-flag--new">NOWY</span>}
           {isArchived && <span className="vdbc-flag vdbc-flag--arch">ARCH.</span>}
+          {pendingDelete && <span className="vdbc-flag vdbc-flag--deleting">USUWA…</span>}
         </div>
 
-        {/* Info block */}
         <div className="vdbc-info">
           <div className="vdbc-title">{title}</div>
           {specParts.length > 0 && (
@@ -316,7 +327,6 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
           </div>
         </div>
 
-        {/* Price + actions — stop propagation so clicks don't toggle expand */}
         <div className="vdbc-aside" onClick={e => e.stopPropagation()}>
           {snap.price != null && (
             <div className="vdbc-price-block">
@@ -328,6 +338,10 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
                 <div className={`vdbc-diff ${priceDiff < 0 ? "vdbc-diff--down" : "vdbc-diff--up"}`}>
                   {priceDiff < 0 ? "▼" : "▲"} {fmt(Math.abs(priceDiff))} PLN
                 </div>
+              )}
+              {/* Sparkline — only rendered when there's actual history to show */}
+              {priceHist.length > 0 && (
+                <PriceSparkline priceHistory={priceHist} currentPrice={snap.price} />
               )}
             </div>
           )}
@@ -343,19 +357,16 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
               className={`vdbc-btn vdbc-btn--del ${delConfirm ? "vdbc-btn--confirm" : ""}`}
               onClick={handleDelete}
               title="Usuń z bazy"
+              disabled={pendingDelete}
             >{delConfirm ? "Na pewno?" : "🗑"}</button>
           </div>
         </div>
 
-        {/* Expand toggle */}
         <div className="vdbc-chevron" aria-hidden="true">{expanded ? "▲" : "▼"}</div>
       </div>
 
-      {/* ── Expanded body ── */}
       {expanded && (
         <div className="vdbc-body">
-
-          {/* Image strip */}
           {snap.images?.length > 1 && (
             <div className="vdbc-imgstrip">
               {snap.images.slice(0, 8).map((u, i) => (
@@ -364,7 +375,6 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
             </div>
           )}
 
-          {/* Spec grid */}
           {specItems.length > 0 && (
             <div className="vdbc-specs">
               {specItems.map(({ lbl, val }) => (
@@ -376,7 +386,6 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
             </div>
           )}
 
-          {/* Price history */}
           {priceHist.length > 0 && (
             <div className="vdbc-section">
               <div className="vdbc-section-hdr">Historia ceny</div>
@@ -393,40 +402,23 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
             </div>
           )}
 
-          {/* CEPiK section */}
           <div className="vdbc-section vdbc-cepik-section">
             <div className="vdbc-section-hdr">
               Weryfikacja CEPiK
               {missing.length > 0 && (
                 <span className="vdbc-missing-tag">brakuje: {missing.join(", ")}</span>
               )}
-              {cepikStatus === "ok" && (
-                <span className="vdbc-verified-tag">✓ Zweryfikowany</span>
-              )}
-              {cepikStatus === "issues" && (
-                <span className="vdbc-issues-tag">⚠ Rozbieżności</span>
-              )}
+              {cepikStatus === "ok" && <span className="vdbc-verified-tag">✓ Zweryfikowany</span>}
+              {cepikStatus === "issues" && <span className="vdbc-issues-tag">⚠ Rozbieżności</span>}
             </div>
 
             <div className="vdbc-fields">
-              <InlineField
-                label="Nr rejestracyjny"
-                value={effPlate}
-                fieldKey="licensePlate"
-                onSave={val => handleSaveField("manual_license_plate", val)}
-              />
-              <InlineField
-                label="VIN"
-                value={effVin}
-                fieldKey="vin"
-                onSave={val => handleSaveField("manual_vin", val)}
-              />
-              <InlineField
-                label="Data 1. rejestracji"
-                value={effFirstReg}
-                fieldKey="firstRegistration"
-                onSave={val => handleSaveField("manual_first_registration", val)}
-              />
+              <InlineField label="Nr rejestracyjny" value={effPlate} fieldKey="licensePlate"
+                onSave={val => handleSaveField("manual_license_plate", val)} />
+              <InlineField label="VIN" value={effVin} fieldKey="vin"
+                onSave={val => handleSaveField("manual_vin", val)} />
+              <InlineField label="Data 1. rejestracji" value={effFirstReg} fieldKey="firstRegistration"
+                onSave={val => handleSaveField("manual_first_registration", val)} />
             </div>
 
             <div className="vdbc-verify-row">
@@ -458,7 +450,6 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
             )}
           </div>
 
-          {/* Seller / location */}
           {(snap.seller || snap.location) && (
             <div className="vdbc-meta-footer">
               {snap.seller  && <span>👤 {snap.seller}</span>}
@@ -466,34 +457,22 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
             </div>
           )}
 
-          {/* Cross-portal duplicate links */}
           {dups.length > 0 && (
             <div className="vdbc-dup-section">
               <div className="vdbc-dup-title">Ogłoszenia na innych portalach</div>
               <div className="vdbc-dup-links">
-                {/* Primary listing link */}
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`vdbc-dup-link ${isOlx ? "vdbc-dup-link--olx" : "vdbc-dup-link--oto"}`}
-                >
+                <a href={url} target="_blank" rel="noreferrer"
+                  className={`vdbc-dup-link ${isOlx ? "vdbc-dup-link--olx" : "vdbc-dup-link--oto"}`}>
                   <span className="vdbc-dup-link-dot" />
                   {isOlx ? "OLX" : "Otomoto"}
                   <span className="vdbc-dup-link-arr">↗</span>
                 </a>
-                {/* Duplicate links */}
                 {dups.map(dup => {
                   const dupUrl = dup.listing_url || dup.snapshot_json?.listingUrl || "";
                   const dupOlx = dupUrl.includes("olx.pl");
                   return (
-                    <a
-                      key={dup.id}
-                      href={dupUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`vdbc-dup-link ${dupOlx ? "vdbc-dup-link--olx" : "vdbc-dup-link--oto"}`}
-                    >
+                    <a key={dup.id} href={dupUrl} target="_blank" rel="noreferrer"
+                      className={`vdbc-dup-link ${dupOlx ? "vdbc-dup-link--olx" : "vdbc-dup-link--oto"}`}>
                       <span className="vdbc-dup-link-dot" />
                       {dupOlx ? "OLX" : "Otomoto"}
                       <span className="vdbc-dup-link-arr">↗</span>
@@ -510,16 +489,16 @@ function VehicleCard({ row, dups = [], onOpen, onDelete, onPatch, onVerify, stat
 }
 
 /* ═══════════════════════════════════════════════════════════
-   GROUP STATS — simplified 4-metric bar
+   GROUP STATS
    ═══════════════════════════════════════════════════════════ */
 
 function GroupStats({ stats, filter }) {
   if (!stats || stats.count === 0) return null;
   const metrics = [
-    { lbl: "Śr. cena",    val: stats.avgPrice    ? `${fmt(stats.avgPrice)} PLN`   : null },
-    { lbl: "Mediana",     val: stats.medPrice    ? `${fmt(stats.medPrice)} PLN`   : null },
-    { lbl: "Śr. przebieg",val: stats.avgMileage  ? `${fmt(stats.avgMileage)} km`  : null },
-    { lbl: "Szt.",        val: String(stats.count) },
+    { lbl: "Śr. cena",     val: stats.avgPrice    ? `${fmt(stats.avgPrice)} PLN`  : null },
+    { lbl: "Mediana",      val: stats.medPrice    ? `${fmt(stats.medPrice)} PLN`  : null },
+    { lbl: "Śr. przebieg", val: stats.avgMileage  ? `${fmt(stats.avgMileage)} km` : null },
+    { lbl: "Szt.",         val: String(stats.count) },
   ].filter(m => m.val);
 
   return (
@@ -546,11 +525,11 @@ function GroupStats({ stats, filter }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   FILTER GROUP — collapsible section
+   FILTER GROUP — now receives collapsed/onToggle from parent
+   so state persists across tab switches (stored in localStorage)
    ═══════════════════════════════════════════════════════════ */
 
-function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVerify, verifyBusy, filterStatus, searchQuery }) {
-  const [collapsed, setCollapsed] = useState(false);
+function FilterGroup({ groupKey, items, filter, collapsed, onToggle, onOpen, onDelete, onPatch, onVerify, verifyBusy, pendingDeleteIds, selectedIds, onToggleSelect }) {
   const stats = useMemo(() => computeGroupStats(items), [items]);
 
   const newCount      = items.filter(r => r.snapshot_json?.__isNew).length;
@@ -560,14 +539,9 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
   const displayName = groupKey === "__manual" ? "Ręczne wyszukiwanie"
     : groupKey === "__none" ? "Bez filtru" : groupKey;
 
-  /**
-   * Deduplicate by first-image fingerprint.
-   * Primary = row with most data (verified > has VIN > otomoto > olx > created earlier).
-   * Returns array of { primary, dups[] }.
-   */
   const dedupedItems = useMemo(() => {
-    const fpMap = new Map(); // fingerprint -> [rows]
-    const noFp  = [];        // rows without a first image
+    const fpMap = new Map();
+    const noFp  = [];
 
     for (const row of items) {
       const fp = getImgFingerprint(row.snapshot_json?.images?.[0]);
@@ -583,7 +557,7 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
       const vin  = row.manual_vin || snap.vin;
       if (vin)                                           s += 100;
       const url  = row.listing_url || snap.listingUrl || "";
-      if (!url.includes("olx.pl"))                       s += 10;  // prefer otomoto (has more data)
+      if (!url.includes("olx.pl"))                       s += 10;
       return s;
     };
 
@@ -597,16 +571,25 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
       }
     }
     for (const row of noFp) result.push({ primary: row, dups: [] });
-
     return result;
   }, [items]);
 
+  // Show merge count when deduplication hid items
+  const mergedCount = dedupedItems.reduce((n, d) => n + d.dups.length, 0);
+
   return (
     <div className={`vdb-group ${collapsed ? "vdb-group--collapsed" : ""}`}>
-      <div className="vdb-group-hdr" onClick={() => setCollapsed(v => !v)}>
+      <div className="vdb-group-hdr" onClick={onToggle}>
         <span className="vdb-group-chevron">{collapsed ? "▶" : "▼"}</span>
         <span className="vdb-group-name">{displayName}</span>
         <span className="vdb-group-count">{items.length}</span>
+
+        {/* Dedup badge — tells users cross-portal duplicates were merged */}
+        {mergedCount > 0 && (
+          <span className="vdb-gbadge vdb-gbadge--merged" title={`${mergedCount} ogłoszeń połączono jako duplikaty cross-portalu`}>
+            {mergedCount} × 2 portale
+          </span>
+        )}
 
         <div className="vdb-group-badges">
           {newCount > 0      && <span className="vdb-gbadge vdb-gbadge--new">{newCount} nowych</span>}
@@ -636,6 +619,9 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
                 onVerify={onVerify}
                 stats={stats}
                 verifyBusy={verifyBusy[primary.id]}
+                pendingDelete={pendingDeleteIds.has(primary.id)}
+                selected={selectedIds?.has(primary.id)}
+                onToggleSelect={onToggleSelect}
               />
             ))}
           </div>
@@ -650,11 +636,47 @@ function FilterGroup({ groupKey, items, filter, onOpen, onDelete, onPatch, onVer
    ═══════════════════════════════════════════════════════════ */
 
 export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
-  const [vehicles,    setVehicles]    = useState([]);
-  const [loading,     setLoading]     = useState(false);
-  const [filterStatus,setFilterStatus]= useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [verifyBusy,  setVerifyBusy]  = useState({});
+  const [vehicles,      setVehicles]      = useState([]);
+  const [loading,       setLoading]       = useState(false);
+  const [filterStatus,  setFilterStatus]  = useState("all");
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [verifyBusy,    setVerifyBusy]    = useState({});
+  const [batchVerifyBusy, setBatchVerifyBusy] = useState(false);
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const handleToggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // handleSelectAll / handleClearSelection defined after `filtered` memo below
+
+  // Group collapse state — persisted in localStorage so it survives tab switches
+  const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedState);
+
+  // Undo-delete: optimistically remove rows but delay actual API call by 5s
+  const [undoStack,       setUndoStack]    = useState([]); // [{id, label, row}]
+  const pendingTimersRef  = useRef({});                    // { id: timeoutId }
+
+  const toggleGroup = useCallback((key) => {
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveCollapsedState(next);
+      return next;
+    });
+  }, []);
+
+  const pendingDeleteIds = useMemo(
+    () => new Set(undoStack.map(u => u.id)),
+    [undoStack]
+  );
+
+  const { exportCsv, exportJson } = useExport();
 
   const loadVehicles = useCallback(async () => {
     if (!me) return;
@@ -669,11 +691,44 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
 
   useEffect(() => { loadVehicles(); }, [loadVehicles]);
 
-  const handleDelete = useCallback(async (id) => {
-    const res = await apiFetch(`/searches/${id}`, { method: "DELETE" });
-    if (res.ok || res.status === 204) {
+  /* ── Undo-delete: schedule deletion, allow cancellation ── */
+  const handleDelete = useCallback((id) => {
+    const row = vehicles.find(v => v.id === id);
+    if (!row) return;
+
+    const snap = row.snapshot_json || {};
+    const label = [snap.brand, snap.model, snap.year].filter(Boolean).join(" ") || "Pojazd";
+
+    // Optimistically hide in current list (still visible with "pending" style)
+    setUndoStack(prev => [...prev.filter(u => u.id !== id), { id, label, row }]);
+
+    // Schedule actual DELETE after 5 seconds
+    const timer = setTimeout(async () => {
+      await apiFetch(`/searches/${id}`, { method: "DELETE" });
       setVehicles(prev => prev.filter(v => v.id !== id));
+      setUndoStack(prev => prev.filter(u => u.id !== id));
+      delete pendingTimersRef.current[id];
+    }, UNDO_DURATION_MS);
+
+    pendingTimersRef.current[id] = timer;
+  }, [vehicles]);
+
+  /* ── Undo: cancel timer and restore row ── */
+  const handleUndoDelete = useCallback((id) => {
+    const timer = pendingTimersRef.current[id];
+    if (timer) {
+      clearTimeout(timer);
+      delete pendingTimersRef.current[id];
     }
+    setUndoStack(prev => prev.filter(u => u.id !== id));
+    // Row was never actually removed from vehicles — just un-pending it
+  }, []);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(pendingTimersRef.current).forEach(clearTimeout);
+    };
   }, []);
 
   const handleOpen = useCallback((id) => { onOpenItem?.(id); }, [onOpenItem]);
@@ -722,9 +777,10 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
     }
   }, []);
 
-  /* Filter & group */
+  /* ── Filter & group ── */
   const filtered = useMemo(() => {
-    let list = vehicles;
+    // Exclude pending-deleted rows from the view
+    let list = vehicles.filter(v => !pendingDeleteIds.has(v.id));
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(v => {
@@ -736,7 +792,50 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
       list = list.filter(v => getCepikStatus(v) === filterStatus);
     }
     return list;
-  }, [vehicles, filterStatus, searchQuery]);
+  }, [vehicles, filterStatus, searchQuery, pendingDeleteIds]);
+
+  // ── Selection handlers (defined after `filtered`) ──
+  const handleSelectAll      = useCallback(() => setSelectedIds(new Set(filtered.map(v => v.id))), [filtered]);
+  const handleClearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Verifiable IDs = selected rows that have plate + vin + firstReg
+  const verifiableSelectedIds = useMemo(() => {
+    return filtered
+      .filter(v => selectedIds.has(v.id))
+      .filter(v => {
+        const s = v.snapshot_json || {};
+        const plate = v.manual_license_plate || s.licensePlate;
+        const vin   = v.manual_vin           || s.vin;
+        const fr    = v.manual_first_registration || s.firstRegistration;
+        return (
+          plate && isValidLicensePlate(normalizeLicensePlate(plate)) &&
+          vin   && isValidVin(normalizeVin(vin)) &&
+          fr    && /^\d{4}-\d{2}-\d{2}$/.test(normalizeDateForCepik(fr))
+        );
+      })
+      .map(v => v.id);
+  }, [filtered, selectedIds]);
+
+  // Batch delete — reuses undo-delete flow for each selected id
+  const handleBatchDelete = useCallback(() => {
+    const ids = [...selectedIds];
+    ids.forEach(id => handleDelete(id));
+    setSelectedIds(new Set());
+  }, [selectedIds, handleDelete]);
+
+  // Batch CEPiK verify — sequential with a short delay to avoid rate-limiting
+  const handleBatchVerify = useCallback(async () => {
+    if (!verifiableSelectedIds.length) return;
+    setBatchVerifyBusy(true);
+    for (const id of verifiableSelectedIds) {
+      const row = vehicles.find(v => v.id === id);
+      if (row) await handleVerify(row);
+      // Brief pause between requests to respect CEPiK rate limit
+      await new Promise(r => setTimeout(r, 800));
+    }
+    setBatchVerifyBusy(false);
+    setSelectedIds(new Set());
+  }, [verifiableSelectedIds, vehicles, handleVerify]);
 
   const grouped = useMemo(() => {
     const groups = {};
@@ -789,17 +888,60 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
             {archivedCount > 0 && <span className="vdb-total-arch"> · {archivedCount} archiwum</span>}
           </div>
         </div>
-        <button
-          type="button"
-          className="vdb-refresh-btn"
-          onClick={loadVehicles}
-          disabled={loading}
-          title="Odśwież"
-        >
-          <span className={loading ? "vdb-refresh-spin" : ""}>↻</span>
-          {loading ? "Ładuję…" : "Odśwież"}
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Export buttons — only shown when there are vehicles */}
+          {vehicles.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="vdb-export-btn"
+                onClick={() => exportCsv(vehicles)}
+                title="Eksportuj wszystkie do CSV"
+              >
+                ⬇ CSV
+              </button>
+              <button
+                type="button"
+                className="vdb-export-btn"
+                onClick={() => exportJson(vehicles)}
+                title="Eksportuj wszystkie do JSON"
+              >
+                ⬇ JSON
+              </button>
+            </>
+          )}
+          {/* Collapse all / expand all */}
+          {grouped.length > 1 && (
+            <button
+              type="button"
+              className="vdb-refresh-btn"
+              onClick={() => {
+                const allCollapsed = grouped.every(([k]) => collapsedGroups[k]);
+                const next = {};
+                grouped.forEach(([k]) => { next[k] = !allCollapsed; });
+                setCollapsedGroups(next);
+                saveCollapsedState(next);
+              }}
+              title={grouped.every(([k]) => collapsedGroups[k]) ? "Rozwiń wszystkie" : "Zwiń wszystkie"}
+            >
+              {grouped.every(([k]) => collapsedGroups[k]) ? "⊞" : "⊟"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="vdb-refresh-btn"
+            onClick={loadVehicles}
+            disabled={loading}
+            title="Odśwież"
+          >
+            <span className={loading ? "vdb-refresh-spin" : ""}>↻</span>
+            {loading ? "Ładuję…" : "Odśwież"}
+          </button>
+        </div>
       </div>
+
+      {/* Global portfolio stats */}
+      {vehicles.length > 0 && <DbStatsPanel vehicles={vehicles} />}
 
       {/* Search + Status filters */}
       {vehicles.length > 0 && (
@@ -819,11 +961,11 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
 
           <div className="vdb-status-pills">
             {[
-              { key: "all",     label: "Wszystkie",   val: vehicles.length },
-              { key: "ok",      label: "✓ OK",         val: counts.ok,      show: counts.ok > 0 },
-              { key: "issues",  label: "⚠ Uwagi",      val: counts.issues,  show: counts.issues > 0 },
-              { key: "pending", label: "○ Nie zwerif.",val: counts.pending, show: counts.pending > 0 },
-              { key: "no_data", label: "– Brak danych",val: counts.no_data, show: counts.no_data > 0 },
+              { key: "all",     label: "Wszystkie",    val: vehicles.length },
+              { key: "ok",      label: "✓ OK",          val: counts.ok,      show: counts.ok > 0 },
+              { key: "issues",  label: "⚠ Uwagi",       val: counts.issues,  show: counts.issues > 0 },
+              { key: "pending", label: "○ Nie zwerif.", val: counts.pending, show: counts.pending > 0 },
+              { key: "no_data", label: "– Brak danych", val: counts.no_data, show: counts.no_data > 0 },
             ].filter(p => p.show !== false).map(({ key, label, val }) => (
               <button
                 key={key}
@@ -869,18 +1011,36 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters = [] }) {
                 groupKey={groupKey}
                 items={items}
                 filter={matchedFilter}
+                collapsed={!!collapsedGroups[groupKey]}
+                onToggle={() => toggleGroup(groupKey)}
                 onOpen={handleOpen}
                 onDelete={handleDelete}
                 onPatch={handlePatch}
                 onVerify={handleVerify}
                 verifyBusy={verifyBusy}
-                filterStatus={filterStatus}
-                searchQuery={searchQuery}
+                pendingDeleteIds={pendingDeleteIds}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
               />
             );
           })}
         </div>
       )}
+
+      {/* Bulk action bar — floats above undo stack */}
+      <BulkActionBar
+        selectedIds={selectedIds}
+        totalVisible={filtered.length}
+        verifiableIds={verifiableSelectedIds}
+        verifyBusy={batchVerifyBusy}
+        onSelectAll={handleSelectAll}
+        onClearAll={handleClearSelection}
+        onBatchDelete={handleBatchDelete}
+        onBatchVerify={handleBatchVerify}
+      />
+
+      {/* Undo delete toast — fixed position bottom-left */}
+      <UndoToast stack={undoStack} onUndo={handleUndoDelete} />
     </div>
   );
 }

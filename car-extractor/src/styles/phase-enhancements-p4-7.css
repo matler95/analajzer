@@ -1,0 +1,466 @@
+/* ═══════════════════════════════════════════════════════════
+   PHASE 4 — FILTER EDITING
+   ═══════════════════════════════════════════════════════════ */
+
+/* Edit button sits between run and delete */
+.filter-edit-btn {
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border2);
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.filter-edit-btn:hover {
+  color: var(--amber);
+  background: var(--amber-bg);
+}
+
+/* Edit form has an amber left border to distinguish from the add form */
+.ft-add-form--edit {
+  border-color: var(--sub);
+  border-left: 3px solid var(--amber);
+}
+
+.ft-add-form--edit .ft-add-title {
+  color: var(--amber);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 5 — SCAN HISTORY DRAWER
+   ═══════════════════════════════════════════════════════════ */
+
+.scan-hist-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 100vw;
+  background: var(--card);
+  border-left: 1px solid var(--border2);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .3s cubic-bezier(.2, 0, 0, 1);
+}
+
+.scan-hist-drawer.open { transform: translateX(0); }
+
+.scan-hist-clear-btn {
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color .15s;
+}
+
+.scan-hist-clear-btn:hover { color: var(--red); }
+
+.scan-hist-row {
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: var(--card2);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .15s;
+}
+
+.scan-hist-row:hover { border-color: var(--amber); }
+
+.scan-hist-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scan-hist-filter-name {
+  font-family: var(--ff-d);
+  font-size: 18px;
+  letter-spacing: .5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-hist-date {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  flex-shrink: 0;
+}
+
+.scan-hist-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.scan-hist-stat {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+}
+
+.scan-hist-stat-val  { color: var(--text); font-weight: 600; }
+.scan-hist-stat-lbl  { color: var(--sub); }
+
+.scan-hist-stat--new   { color: var(--green); font-weight: 600; }
+.scan-hist-stat--arch  { color: var(--sub); }
+.scan-hist-stat--price { color: var(--amber); }
+.scan-hist-stat--none  { color: var(--muted); font-style: italic; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 5 — KEYBOARD HELP MODAL
+   ═══════════════════════════════════════════════════════════ */
+
+/* ? button in the main nav */
+.main-nav-help-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 11px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  transition: all .15s;
+}
+
+.main-nav-help-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* Keyboard shortcut link in hint row */
+.hint-kbd-btn {
+  background: none;
+  border: none;
+  color: var(--amber);
+  font-family: var(--ff-m);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity .15s;
+}
+
+.hint-kbd-btn:hover { opacity: .75; }
+
+/* Modal backdrop — contributes layout height (no position:fixed) */
+.kbd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .65);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn .2s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.kbd-modal {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-top: 3px solid var(--amber);
+  border-radius: 8px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  animation: scaleIn .2s ease;
+  overflow: hidden;
+}
+
+@keyframes scaleIn { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.kbd-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border2);
+}
+
+.kbd-modal-title {
+  font-family: var(--ff-d);
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+.kbd-modal-body {
+  padding: 12px 0;
+}
+
+.kbd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 18px;
+  transition: background .1s;
+}
+
+.kbd-row:hover { background: var(--card2); }
+
+.kbd-label {
+  font-family: var(--ff-m);
+  font-size: 11px;
+  color: var(--text);
+  flex: 1;
+}
+
+.kbd-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.kbd-or {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  margin: 0 4px;
+}
+
+.kbd-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 7px;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.kbd-modal-footer {
+  padding: 10px 18px;
+  border-top: 1px solid var(--border2);
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  background: var(--card2);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 6 — PRICE SPARKLINE
+   ═══════════════════════════════════════════════════════════ */
+
+.price-sparkline {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 6 — GLOBAL DB STATS PANEL
+   ═══════════════════════════════════════════════════════════ */
+
+.dsp-wrap {
+  margin-bottom: 8px;
+  animation: fadeUp .25s ease;
+}
+
+.dsp-label {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--amber);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dsp-label::before {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 2px;
+  background: var(--amber);
+}
+
+.dsp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dsp-tile {
+  background: var(--card2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background .15s;
+}
+
+.dsp-tile:hover { background: var(--card); }
+
+.dsp-tile-val {
+  font-family: var(--ff-d);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: .5px;
+}
+
+.dsp-tile-lbl {
+  font-family: var(--ff-m);
+  font-size: 8px;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.dsp-tile-sub {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* Semantic colors */
+.dsp-tile--good  .dsp-tile-val { color: var(--green); }
+.dsp-tile--warn  .dsp-tile-val { color: var(--red);   }
+.dsp-tile--new   .dsp-tile-val { color: #7fffbe;      }
+.dsp-tile--muted .dsp-tile-val { color: var(--sub);   }
+
+@media (max-width: 500px) {
+  .dsp-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 7 — SESSION EXPIRED MODAL
+   ═══════════════════════════════════════════════════════════ */
+
+.sess-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .75);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn .2s ease;
+}
+
+.sess-modal {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-top: 3px solid var(--red);
+  border-radius: 8px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  animation: scaleIn .2s ease;
+}
+
+.sess-icon {
+  font-size: 32px;
+  opacity: .75;
+}
+
+.sess-title {
+  font-family: var(--ff-d);
+  font-size: 28px;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+.sess-desc {
+  font-family: var(--ff-m);
+  font-size: 11px;
+  color: var(--sub);
+  line-height: 1.7;
+  max-width: 300px;
+}
+
+.sess-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.sess-form .verify-input {
+  text-align: left;
+}
+
+.sess-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+}
+
+.sess-actions .verify-btn {
+  flex: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   BACKGROUND JOB OVERLAY — footer row with history link
+   ═══════════════════════════════════════════════════════════ */
+
+.bgjob-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bgjob-hist-btn {
+  background: transparent;
+  border: none;
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 9px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color .15s;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bgjob-hist-btn:hover { color: var(--amber); }

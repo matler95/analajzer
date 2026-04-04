@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import VerifyPanel from "./VerifyPanel.jsx";
 import CepikResult from "./CepikResult.jsx";
 import { buildExportPayload } from "../utils/normalize.js";
@@ -13,9 +13,6 @@ const FIELDS = [
   { key: "transmission",       lbl: "Skrzynia" },
   { key: "drivetrain",         lbl: "Napęd" },
   { key: "bodyType",           lbl: "Nadwozie" },
-  // { key: "color",              lbl: "Kolor" },
-  // { key: "doors",              lbl: "Drzwi" },
-  // { key: "seats",              lbl: "Miejsca" },
 ];
 
 const COMPARISON_TO_UI = {
@@ -79,27 +76,29 @@ function Lightbox({ images, initialIndex, onClose }) {
 }
 
 /* ─── HERO IMAGE ────────────────────────────────────────── */
+// FIX: lightboxOpen is now an index (number) or null, not boolean.
+// This means thumbnail clicks correctly open the lightbox at the
+// clicked photo rather than always jumping to image 0.
 function HeroImage({ images, verificationBadge, brand, model, price, currency, portal }) {
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(null); // null | index
   const mainImage = images?.[0];
 
   return (
     <>
       <div className="car-hero-v2">
-        {/* Full-bleed image */}
-        <div className="car-hero-img-wrap" onClick={mainImage ? () => setLightboxOpen(true) : undefined}
-             style={{ cursor: mainImage ? "zoom-in" : "default" }}>
+        <div
+          className="car-hero-img-wrap"
+          onClick={mainImage ? () => setLightboxOpen(0) : undefined}
+          style={{ cursor: mainImage ? "zoom-in" : "default" }}
+        >
           {mainImage
             ? <img src={mainImage} alt="Zdjęcie pojazdu" className="car-hero-img-full" />
             : <div className="car-hero-img-placeholder"><span className="vx-logo">VX</span></div>
           }
-          {/* Gradient overlay for text legibility */}
           <div className="car-hero-overlay" />
         </div>
 
-        {/* Overlaid content */}
         <div className="car-hero-overlay-content">
-          {/* Top row: portal badge + verification score */}
           <div className="car-hero-top-row">
             {portal && (
               <div className="car-hero-portal-badge">{portal.toUpperCase()}</div>
@@ -111,7 +110,6 @@ function HeroImage({ images, verificationBadge, brand, model, price, currency, p
             )}
           </div>
 
-          {/* Bottom row: brand/model/price */}
           <div className="car-hero-bottom-row">
             <div className="car-hero-title-block">
               <div className="car-hero-brand">{brand ?? "Nieznana marka"}</div>
@@ -129,7 +127,6 @@ function HeroImage({ images, verificationBadge, brand, model, price, currency, p
           </div>
         </div>
 
-        {/* Thumbnail strip if multiple images */}
         {images?.length > 1 && (
           <div className="car-hero-thumbstrip">
             {images.slice(0, 6).map((img, i) => (
@@ -137,15 +134,19 @@ function HeroImage({ images, verificationBadge, brand, model, price, currency, p
                 key={i}
                 type="button"
                 className="car-hero-thumb"
-                onClick={() => setLightboxOpen(true)}
+                // FIX: pass i so the lightbox opens at the clicked thumbnail
+                onClick={(e) => { e.stopPropagation(); setLightboxOpen(i); }}
                 aria-label={`Zdjęcie ${i + 1}`}
               >
                 <img src={img} alt="" />
               </button>
             ))}
             {images.length > 6 && (
-              <button type="button" className="car-hero-thumb car-hero-thumb-more"
-                onClick={() => setLightboxOpen(true)}>
+              <button
+                type="button"
+                className="car-hero-thumb car-hero-thumb-more"
+                onClick={(e) => { e.stopPropagation(); setLightboxOpen(6); }}
+              >
                 +{images.length - 6}
               </button>
             )}
@@ -153,8 +154,13 @@ function HeroImage({ images, verificationBadge, brand, model, price, currency, p
         )}
       </div>
 
-      {lightboxOpen && (
-        <Lightbox images={images} initialIndex={0} onClose={() => setLightboxOpen(false)} />
+      {/* FIX: was `lightboxOpen && initialIndex={0}` — now uses the stored index */}
+      {lightboxOpen !== null && (
+        <Lightbox
+          images={images}
+          initialIndex={lightboxOpen}
+          onClose={() => setLightboxOpen(null)}
+        />
       )}
     </>
   );
@@ -168,16 +174,27 @@ export default function ResultCard({
 }) {
   const [activeTab, setActiveTab] = useState("specs");
   const [showDebug, setShowDebug] = useState(false);
-  const [galleryLightbox, setGalleryLightbox] = useState(null); // index or null
+  const [galleryLightbox, setGalleryLightbox] = useState(null);
   const compLookup = buildComparisonLookup(cepik);
   const hasCepik = Boolean(cepik);
 
-  const cepikTabDisabledTitle =
-    "Najpierw przeprowadź weryfikację przyciskiem „Weryfikuj z gov.pl” w zakładce Specyfikacja.";
+  // FIX: Auto-switch to CEPiK tab when verification completes.
+  // Uses a ref to track the previous value so we only switch on the
+  // transition from null → result, not on every render.
+  const prevCepikRef = useRef(null);
+  useEffect(() => {
+    if (cepik && !prevCepikRef.current) {
+      setActiveTab("cepik");
+    }
+    prevCepikRef.current = cepik;
+  }, [cepik]);
 
   useEffect(() => {
     if (activeTab === "cepik" && !hasCepik) setActiveTab("specs");
   }, [activeTab, hasCepik]);
+
+  const cepikTabDisabledTitle =
+    "Najpierw przeprowadź weryfikację przyciskiem 'Weryfikuj z gov.pl' w zakładce Specyfikacja.";
 
   const dlJSON = () => {
     const name = [data.brand, data.model, data.year].filter(Boolean).join("-");
@@ -198,7 +215,6 @@ export default function ResultCard({
   return (
     <div className="result">
 
-      {/* ─── HERO V2 ─── */}
       <HeroImage
         images={data.images}
         verificationBadge={verificationBadge}
@@ -209,7 +225,6 @@ export default function ResultCard({
         portal={data.portal}
       />
 
-      {/* Variant subtitle below hero if present */}
       {data.variant && (
         <div className="car-variant-bar">{data.variant}</div>
       )}
@@ -221,7 +236,11 @@ export default function ResultCard({
           { key: "photos", label: `Zdjęcia${data.images?.length ? ` (${data.images.length})` : ""}`, disabled: false },
           { key: "desc", label: "Opis", disabled: false },
           { key: "seller", label: "Sprzedający", disabled: false },
-          { key: "cepik", label: "CEPiK", disabled: !hasCepik },
+          {
+            key: "cepik",
+            label: hasCepik ? "CEPiK ✓" : "CEPiK",
+            disabled: !hasCepik,
+          },
         ].map(tab => (
           <div
             key={tab.key}
@@ -230,7 +249,7 @@ export default function ResultCard({
           >
             <button
               type="button"
-              className={`result-tab ${activeTab === tab.key ? "on" : ""}`}
+              className={`result-tab ${activeTab === tab.key ? "on" : ""} ${tab.key === "cepik" && hasCepik ? "result-tab--cepik-ready" : ""}`}
               onClick={() => !tab.disabled && setActiveTab(tab.key)}
               disabled={tab.disabled}
               aria-disabled={tab.disabled}
@@ -273,6 +292,15 @@ export default function ResultCard({
             })}
           </div>
 
+          {/* FIX: VIN loading banner — replaces the invisible inline spinner.
+              Shows clearly that a background Playwright session is fetching the VIN. */}
+          {vinLoading && (
+            <div className="vin-loading-banner">
+              <div className="vin-loading-spin" aria-hidden="true" />
+              <span>Pobieranie numeru VIN z ogłoszenia Otomoto…</span>
+            </div>
+          )}
+
           <VerifyPanel
             me={me}
             data={data}
@@ -285,7 +313,7 @@ export default function ResultCard({
         </div>
       )}
 
-      {/* ─── CEPIK TAB (po weryfikacji) ─── */}
+      {/* ─── CEPIK TAB ─── */}
       {activeTab === "cepik" && hasCepik && (
         <div className="result-tab-content">
           <CepikResult cepik={cepik} />

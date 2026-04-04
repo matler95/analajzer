@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { buildOtomotoUrlFull, buildOlxUrl } from "../utils/otomotoData.js";
 
 const FILTERS_KEY = "analajzer_filters_v2";
 
@@ -7,23 +8,32 @@ function loadFilters() {
     const raw = localStorage.getItem(FILTERS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    // Migrate old v1 filters that had maxPages
     return parsed.map(f => {
       const { maxPages, ...rest } = f;
       if (!rest.portal) rest.portal = "otomoto";
       return rest;
     });
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function persistFilters(filters) {
-  try {
-    localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
-  } catch {
-    // ignore storage errors
+  try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); }
+  catch { /* ignore */ }
+}
+
+/**
+ * Rebuild searchUrls from vehicles + params + portal.
+ * Called when a filter is edited so the stored URLs stay in sync
+ * with the new configuration.
+ */
+function buildSearchUrls(vehicles, params, portal) {
+  const entries = [];
+  for (const v of vehicles.filter(vv => vv.brand)) {
+    const commonParams = { ...params, brand: v.brand, model: v.model };
+    if (portal === "otomoto" || portal === "both") entries.push(buildOtomotoUrlFull(commonParams));
+    if (portal === "olx"     || portal === "both") entries.push(buildOlxUrl(commonParams));
   }
+  return entries;
 }
 
 export function useFilters() {
@@ -60,9 +70,33 @@ export function useFilters() {
     });
   }, []);
 
+  /**
+   * updateFilter — used for both programmatic updates (markFilterRun)
+   * and user-facing edits from FiltersTab.
+   * When the update includes vehicles/params/portal, regenerates searchUrls
+   * so the stored URLs stay in sync with the current configuration.
+   */
   const updateFilter = useCallback((id, updates) => {
     setFilters(prev => {
-      const next = prev.map(f => f.id === id ? { ...f, ...updates } : f);
+      const next = prev.map(f => {
+        if (f.id !== id) return f;
+        const merged = { ...f, ...updates };
+
+        // If any of the URL-determining fields changed, regenerate searchUrls
+        const urlDeterminingFields = ["vehicles", "params", "portal"];
+        const anyUrlFieldChanged = urlDeterminingFields.some(k => k in updates);
+        if (anyUrlFieldChanged) {
+          const newUrls = buildSearchUrls(
+            merged.vehicles ?? [],
+            merged.params   ?? {},
+            merged.portal   ?? "otomoto",
+          );
+          merged.searchUrls = newUrls;
+          merged.searchUrl  = newUrls[0] ?? "";
+        }
+
+        return merged;
+      });
       persistFilters(next);
       return next;
     });
@@ -74,9 +108,9 @@ export function useFilters() {
         f.id === id
           ? {
               ...f,
-              lastRunAt: new Date().toISOString(),
-              lastRunCount: stats.processedCount ?? 0,
-              lastRunNewCount: stats.newCount ?? 0,
+              lastRunAt:           new Date().toISOString(),
+              lastRunCount:        stats.processedCount ?? 0,
+              lastRunNewCount:     stats.newCount       ?? 0,
               lastRunArchivedCount: stats.archivedCount ?? 0,
             }
           : f

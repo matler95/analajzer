@@ -1,0 +1,397 @@
+/* ═══════════════════════════════════════════════════════════
+   PHASE 8 — BULK ACTION BAR
+   Slides up from bottom when ≥1 vehicle card is selected.
+   ═══════════════════════════════════════════════════════════ */
+
+.bulk-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 450;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--amber);
+  border-radius: 40px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+  animation: bulkBarIn .22s cubic-bezier(.2, 0, 0, 1);
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  max-width: calc(100vw - 48px);
+}
+
+@keyframes bulkBarIn {
+  from { transform: translateX(-50%) translateY(60px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+
+.bulk-bar-count {
+  font-family: var(--ff-m);
+  font-size: 11px;
+  padding: 0 8px 0 4px;
+  color: var(--text);
+}
+
+.bulk-bar-num {
+  font-family: var(--ff-d);
+  font-size: 18px;
+  color: var(--amber);
+  line-height: 1;
+  margin-right: 2px;
+}
+
+.bulk-bar-lbl { color: var(--sub); }
+
+.bulk-bar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border2);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+.bulk-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  color: var(--sub);
+  transition: all .15s;
+}
+
+.bulk-bar-btn--secondary { color: var(--sub); }
+.bulk-bar-btn--secondary:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-bg); }
+
+.bulk-bar-btn--verify {
+  color: var(--green);
+  border-color: #3db87a44;
+  background: #3db87a0a;
+}
+.bulk-bar-btn--verify:hover:not(:disabled) {
+  background: #3db87a1a;
+  border-color: #3db87a88;
+}
+.bulk-bar-btn--verify:disabled { opacity: .4; cursor: not-allowed; }
+
+.bulk-bar-btn--delete {
+  color: var(--red);
+  border-color: #e0454544;
+  background: #e045450a;
+}
+.bulk-bar-btn--delete:hover { background: #e045451a; border-color: #e0454588; }
+
+.bulk-bar-btn--close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.bulk-bar-btn--close:hover { border-color: var(--border2); color: var(--text); }
+
+.bulk-bar-spin {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid #3db87a44;
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Vehicle card selection state ── */
+.vdbc--selected {
+  border-color: var(--amber);
+  box-shadow: inset 0 0 0 1px var(--amber-glow);
+}
+
+.vdbc-checkbox-wrap {
+  width: 36px;
+  height: 100%;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background .12s;
+  border-right: 1px solid var(--border2);
+}
+
+.vdbc-checkbox-wrap:hover { background: var(--card2); }
+
+.vdbc-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border2);
+  border-radius: 4px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #000;
+  transition: all .12s;
+  user-select: none;
+}
+
+.vdbc-checkbox--checked {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #000;
+  font-weight: 700;
+}
+
+/* ── Adjust hdr grid when checkbox is present ── */
+.vdbc--selected .vdbc-hdr,
+.vdbc .vdbc-hdr {
+  /* checkbox column is 36px, added automatically */
+}
+
+@media (max-width: 680px) {
+  .bulk-bar { padding: 8px 10px; gap: 4px; }
+  .bulk-bar-btn { padding: 6px 10px; font-size: 9px; }
+  .bulk-bar-btn--secondary { display: none; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 9 — EXPORT BUTTONS
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.vdb-export-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: #3db87a0a;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 10 — FILTER TEMPLATES
+   ═══════════════════════════════════════════════════════════ */
+
+/* "Szybki start" button in filters header */
+.filter-tpl-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: var(--ff-m);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.filter-tpl-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--amber-bg);
+}
+
+/* Template gallery section */
+.ft-templates {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  padding: 16px 18px 18px;
+  animation: fadeUp .2s ease;
+}
+
+.ft-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.ft-tpl-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s;
+  width: 100%;
+}
+
+.ft-tpl-card:hover:not(:disabled) {
+  border-color: var(--amber);
+  background: var(--card);
+}
+
+.ft-tpl-card--added {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.ft-tpl-emoji {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1;
+  width: 24px;
+  text-align: center;
+}
+
+.ft-tpl-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ft-tpl-label {
+  font-family: var(--ff-d);
+  font-size: 17px;
+  letter-spacing: .5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+}
+
+.ft-tpl-desc {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ft-tpl-action {
+  font-family: var(--ff-d);
+  font-size: 16px;
+  color: var(--amber);
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.ft-tpl-card--added .ft-tpl-action {
+  color: var(--green);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .ft-tpl-grid { grid-template-columns: 1fr; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   MISC POLISH — items that didn't fit earlier phases
+   ═══════════════════════════════════════════════════════════ */
+
+/* Auth nudge: inline sign-in prompt when user tries to save without login */
+.auth-nudge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--amber);
+  border-radius: 4px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  animation: fadeUp .2s ease;
+}
+
+.auth-nudge strong { color: var(--text); }
+
+/* Result tab: CEPiK tab shows pulsing amber dot when verifying */
+.result-tab--cepik-verifying::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+  border-radius: 50%;
+  margin-left: 6px;
+  animation: navpulse 1s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+/* Hint that shows on first load in VerifyPanel */
+.verify-panel-hint {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  padding: 6px 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.verify-panel-hint::before {
+  content: "→";
+  color: var(--amber);
+}
+
+/* Portal badge on scan history entries */
+.scan-hist-portal {
+  font-family: var(--ff-m);
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-left: 4px;
+}
+
+/* Smooth collapse/expand transition on filter groups */
+.vdb-group .vdb-card-list {
+  animation: fadeUp .18s ease;
+}
+
+/* "Collapse all" icon button is square */
+.vdb-refresh-btn[title="Zwiń wszystkie"],
+.vdb-refresh-btn[title="Rozwiń wszystkie"] {
+  font-size: 15px;
+  width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* VDB header left block */
+.vdb-header-left { display: flex; flex-direction: column; gap: 2px; }
+
+/* Database tab badge on "nowych" counter */
+.vdb-total-new  { color: var(--green); font-weight: 600; }
+.vdb-total-arch { color: var(--muted); }

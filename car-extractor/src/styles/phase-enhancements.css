@@ -1,0 +1,466 @@
+/* ═══════════════════════════════════════════════════════════
+   PHASE 1 — VIN LOADING BANNER
+   Replaces the almost-invisible inline spinner in VerifyPanel.
+   Sits between the specs grid and the VerifyPanel section.
+   ═══════════════════════════════════════════════════════════ */
+
+.vin-loading-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--card);
+  border: 1px solid var(--amber);
+  border-left: 3px solid var(--amber);
+  border-top: none;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: .5px;
+  animation: fadeUp .2s ease;
+}
+
+.vin-loading-spin {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--amber-bg);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ─── CEPiK tab indicator when result is ready ─── */
+.result-tab--cepik-ready {
+  color: var(--green) !important;
+}
+
+.result-tab--cepik-ready:not(.on) {
+  animation: cepikPulse 2s ease-in-out 3;
+}
+
+@keyframes cepikPulse {
+  0%, 100% { color: var(--green); }
+  50% { color: var(--amber); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 2 — SEARCH EMPTY STATE
+   ═══════════════════════════════════════════════════════════ */
+
+.ses-wrap {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  padding: 0 0 60px;
+  animation: fadeUp .4s ease;
+}
+
+/* Brand mark */
+.ses-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ses-hex {
+  width: 48px;
+  height: 48px;
+  background: var(--amber);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-d);
+  font-size: 14px;
+  color: #000;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.ses-brand-name {
+  font-family: var(--ff-d);
+  font-size: 28px;
+  letter-spacing: 3px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.ses-brand-tagline {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  letter-spacing: 1.5px;
+  margin-top: 3px;
+}
+
+/* Four-step flow */
+.ses-flow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ses-flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 130px;
+  text-align: center;
+}
+
+.ses-flow-num {
+  font-family: var(--ff-d);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--amber);
+  letter-spacing: 1px;
+}
+
+.ses-flow-body { display: flex; flex-direction: column; gap: 3px; }
+
+.ses-flow-label {
+  font-family: var(--ff-m);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .3px;
+  line-height: 1.4;
+}
+
+.ses-flow-hint {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  letter-spacing: .5px;
+}
+
+.ses-flow-arrow {
+  font-family: var(--ff-m);
+  font-size: 18px;
+  color: var(--muted);
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+/* Portals */
+.ses-portals {
+  display: flex;
+  gap: 12px;
+}
+
+.ses-portal {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  letter-spacing: 1px;
+}
+
+.ses-portal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* CTA hint */
+.ses-cta {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .5px;
+}
+
+.ses-cta kbd {
+  display: inline-block;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--text);
+}
+
+@media (max-width: 680px) {
+  .ses-flow { gap: 0; }
+  .ses-flow-arrow { display: none; }
+  .ses-flow-step { width: calc(50% - 8px); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 2 — WORKFLOW PROGRESS INDICATOR
+   Shows between the URL input and the result card.
+   ═══════════════════════════════════════════════════════════ */
+
+.wfp-wrap {
+  display: flex;
+  align-items: flex-start;
+  margin: 16px 0 0;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  overflow: hidden;
+  animation: fadeUp .25s ease;
+}
+
+.wfp-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  position: relative;
+  transition: background .15s;
+}
+
+.wfp-step--done     { background: var(--card);  opacity: .65; }
+.wfp-step--active   { background: var(--card2); }
+.wfp-step--pending  { background: var(--card);  opacity: .35; }
+.wfp-step--warn     { background: #3a1f1f; }
+
+.wfp-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+  border: 1px solid var(--border2);
+  background: var(--card2);
+  color: var(--sub);
+}
+
+.wfp-step--done   .wfp-dot { background: #1a3a2a; color: #7fffbe; border-color: #3db87a55; }
+.wfp-step--active .wfp-dot { background: var(--amber-bg); color: var(--amber); border-color: var(--amber); animation: navpulse 1.5s ease-in-out infinite; }
+.wfp-step--warn   .wfp-dot { background: #3a1f1f; color: #ffb0b0; border-color: #e0454555; }
+
+.wfp-body { min-width: 0; flex: 1; }
+
+.wfp-label {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+}
+
+.wfp-hint {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--text);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wfp-step--pending .wfp-hint  { color: var(--muted); }
+.wfp-step--done    .wfp-hint  { color: var(--sub);   }
+.wfp-step--warn    .wfp-hint  { color: #ffb0b0;      }
+.wfp-step--active  .wfp-label { color: var(--amber);  }
+
+.wfp-line {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background: var(--border2);
+}
+
+.wfp-line--done { background: #3db87a44; }
+
+@media (max-width: 580px) {
+  .wfp-step { padding: 8px 8px; gap: 5px; }
+  .wfp-hint { display: none; }
+  .wfp-label { font-size: 8px; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 2 — BACK TO SOURCE BUTTON
+   Appears above the result card when opened from DB/history.
+   ═══════════════════════════════════════════════════════════ */
+
+.back-to-source-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 7px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: all .15s;
+  animation: fadeUp .2s ease;
+}
+
+.back-to-source-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--amber-bg);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 3 — UNDO DELETE TOAST
+   Fixed bottom-left, stacks up to 3 items.
+   ═══════════════════════════════════════════════════════════ */
+
+.undo-stack {
+  position: fixed;
+  bottom: 80px;       /* above the bgjob-overlay */
+  left: 24px;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.undo-toast {
+  position: relative;
+  overflow: hidden;
+  width: 280px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  animation: slideInLeft .25s ease;
+  pointer-events: all;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-300px); opacity: 0; }
+  to   { transform: translateX(0);      opacity: 1; }
+}
+
+.undo-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--amber);
+  transition: width 100ms linear;
+}
+
+.undo-toast-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.undo-toast-label {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-toast-label strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.undo-toast-btn {
+  background: var(--amber);
+  border: none;
+  color: #000;
+  font-family: var(--ff-d);
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+
+.undo-toast-btn:hover { background: #ffc22a; }
+
+@media (max-width: 680px) {
+  .undo-stack { left: 12px; bottom: 70px; }
+  .undo-toast { width: calc(100vw - 24px); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 3 — PENDING DELETE STATE ON VEHICLE CARDS
+   ═══════════════════════════════════════════════════════════ */
+
+.vdbc--pending-delete {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  pointer-events: none;
+  transition: opacity .3s, filter .3s;
+}
+
+.vdbc-flag--deleting {
+  background: var(--red);
+  color: #fff;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE 3 — GROUP DEDUP BADGE
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-gbadge--merged {
+  background: rgba(74, 158, 255, 0.12);
+  color: #4a9eff;
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  font-family: var(--ff-m);
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  cursor: help;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   COLLAPSE ALL / EXPAND ALL BUTTON (VDB header)
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-refresh-btn[title="Zwiń wszystkie"],
+.vdb-refresh-btn[title="Rozwiń wszystkie"] {
+  font-size: 16px;
+  width: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

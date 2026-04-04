@@ -1,6 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import "./styles/app.css";
 import "./styles/additions.css";
+import "./styles/phase-enhancements.css";
+import "./styles/phase-enhancements-p4-7.css";
+import "./styles/phase-enhancements-p8-10.css";
 
 import { useAuth } from "./hooks/useAuth.js";
 import { useSearch } from "./hooks/useSearch.js";
@@ -8,6 +11,9 @@ import { useCepik } from "./hooks/useCepik.js";
 import { useHistory } from "./hooks/useHistory.js";
 import { useFilters } from "./hooks/useFilters.js";
 import { useBackgroundJob } from "./hooks/useBackgroundJob.js";
+import { useScanHistory } from "./hooks/useScanHistory.js";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
+import { useSessionGuard } from "./hooks/useSessionGuard.js";
 import { mergeSearchRecord, stripDebug } from "./utils/normalize.js";
 import { apiFetch } from "./api.js";
 
@@ -19,101 +25,113 @@ import StatusBanner from "./components/StatusBanner.jsx";
 import FiltersTab from "./components/FiltersTab.jsx";
 import VehicleDatabaseTab from "./components/VehicleDatabaseTab.jsx";
 import BackgroundJobOverlay from "./components/BackgroundJobOverlay.jsx";
+import SearchEmptyState from "./components/SearchEmptyState.jsx";
+import WorkflowProgress from "./components/WorkflowProgress.jsx";
+import ScanHistoryDrawer from "./components/ScanHistoryDrawer.jsx";
+import KeyboardHelpModal from "./components/KeyboardHelpModal.jsx";
+import SessionExpiredModal from "./components/SessionExpiredModal.jsx";
 
 const MAIN_TABS = [
-  { key: "search",   label: "Wyszukaj"      },
-  { key: "filters",  label: "Filtry"         },
-  { key: "database", label: "Baza pojazdów"  },
+  { key: "search",   label: "Wyszukaj"     },
+  { key: "filters",  label: "Filtry"        },
+  { key: "database", label: "Baza pojazdów" },
 ];
 
 export default function App() {
-  const [historyOpen,  setHistoryOpen]  = useState(false);
-  const [mainTab,      setMainTab]      = useState("search");
-  const [dbRefreshKey, setDbRefreshKey] = useState(0);
-  const [uxNoticeGlobal, setUxNoticeGlobal] = useState(null);
+  const [historyOpen,      setHistoryOpen]     = useState(false);
+  const [scanHistOpen,     setScanHistOpen]    = useState(false);
+  const [helpOpen,         setHelpOpen]        = useState(false);
+  const [mainTab,          setMainTab]         = useState("search");
+  const [dbRefreshKey,     setDbRefreshKey]    = useState(0);
+  const [uxNoticeGlobal,   setUxNoticeGlobal]  = useState(null);
+  const [openedFromSource, setOpenedFromSource]= useState(null);
+  const [sessionExpired,   setSessionExpired]  = useState(false);
+  const urlInputRef = useRef(null);
 
-  // ─── Auth ────────────────────────────────────────────────
+  // ─── Auth ─────────────────────────────────────────────────
   const {
     me, authEmail, setAuthEmail, authPass, setAuthPass, authErr,
-    login, register, logout,
+    login, register, logout, refreshMe,
   } = useAuth();
 
-  // ─── Search ──────────────────────────────────────────────
+  // ─── Session guard ────────────────────────────────────────
+  useSessionGuard({ onExpired: useCallback(() => setSessionExpired(true), []) });
+
+  // ─── Search ───────────────────────────────────────────────
   const {
     url, setUrl, loading, data, setData, error,
     portal, savedSearchId, setSavedSearchId,
     saveBusy, saveMsg, setSaveMsg,
-    cepik, setCepik,
-    vinLoading,
-    run, saveSearch, updateField,
+    cepik, setCepik, vinLoading, run, updateField,
   } = useSearch({ me });
 
-  // ─── CEPiK ───────────────────────────────────────────────
+  // ─── CEPiK ────────────────────────────────────────────────
   const { cepikLoading, cepikErr, setCepikErr, verifyGov } = useCepik({
-    me,
-    data,
-    savedSearchId,
-    onVerified: (result) => {
-      setCepik(result);
-      setSaveMsg(null);
-    },
+    me, data, savedSearchId,
+    onVerified: (result) => { setCepik(result); setSaveMsg(null); },
   });
 
-  // ─── History (kept for backward compat, drawer still works) ──
+  // ─── History ──────────────────────────────────────────────
   const {
-    history, histLoading, histVerifyBusy,
-    uxNotice, setUxNotice,
-    loadHistory, deleteHistoryItem, patchHistoryItem,
-    verifyHistoryItem, openHistoryItem,
+    history, histLoading, histVerifyBusy, uxNotice, setUxNotice,
+    loadHistory, deleteHistoryItem, patchHistoryItem, verifyHistoryItem, openHistoryItem,
   } = useHistory({ me });
 
-  useEffect(() => {
-    if (historyOpen && me) loadHistory();
-  }, [historyOpen, me, loadHistory]);
+  useEffect(() => { if (historyOpen && me) loadHistory(); }, [historyOpen, me, loadHistory]);
 
-  // ─── Filters ─────────────────────────────────────────────
+  // ─── Filters ──────────────────────────────────────────────
   const { filters, addFilter, removeFilter, updateFilter, markFilterRun } = useFilters();
 
-  // ─── Background Job ──────────────────────────────────────
+  // ─── Scan history ─────────────────────────────────────────
+  const { scanHistory, addScanRun, clearScanHistory } = useScanHistory();
+
+  // ─── Background Job ───────────────────────────────────────
   const { job, isRunning, startJob, cancelJob } = useBackgroundJob({
     me,
-    onJobComplete: useCallback(({ processedCount, newCount, archivedCount, priceChanges, filterId }) => {
+    onJobComplete: useCallback((stats) => {
       setDbRefreshKey(k => k + 1);
-      if (filterId) {
-        markFilterRun(filterId, { processedCount, newCount, archivedCount });
-      }
-      // Show summary notice
+      if (stats.filterId) markFilterRun(stats.filterId, stats);
+      const filterName = filters.find(f => f.id === stats.filterId)?.name ?? "Skan";
+      addScanRun({ ...stats, filterName });
       const parts = [];
-      if (newCount > 0)      parts.push(`${newCount} nowych`);
-      if (archivedCount > 0) parts.push(`${archivedCount} archiwalnych`);
-      if (priceChanges > 0)  parts.push(`${priceChanges} zmian cen`);
-      if (parts.length > 0) {
+      if (stats.newCount      > 0) parts.push(`${stats.newCount} nowych`);
+      if (stats.archivedCount > 0) parts.push(`${stats.archivedCount} archiwalnych`);
+      if (stats.priceChanges  > 0) parts.push(`${stats.priceChanges} zmian cen`);
+      if (parts.length) {
         setUxNoticeGlobal({ msg: `Skanowanie zakończone: ${parts.join(", ")}` });
         setTimeout(() => setUxNoticeGlobal(null), 8000);
       }
-    }, [markFilterRun]),
+    }, [markFilterRun, addScanRun, filters]),
   });
 
-  // ─── Save manual search to DB (with __source: "manual") ──
+  // ─── Keyboard shortcuts ───────────────────────────────────
+  useKeyboardShortcuts({
+    onFocusUrl:      useCallback(() => { setMainTab("search"); urlInputRef.current?.focus(); }, []),
+    onSave:          useCallback(() => { if (data && me) saveManualToDb({}); }, [data, me]),
+    onRun:           useCallback(() => { if (url.trim() && !loading) handleRun(); }, [url, loading]),
+    onTabSwitch:     useCallback((key) => setMainTab(key), []),
+    onToggleHelp:    useCallback(() => setHelpOpen(v => !v), []),
+    onToggleHistory: useCallback(() => setHistoryOpen(v => !v), []),
+  });
+
+  // ─── Run ──────────────────────────────────────────────────
+  const handleRun = useCallback(() => { setOpenedFromSource(null); run(); }, [run]);
+
+  // ─── Save ─────────────────────────────────────────────────
   const saveManualToDb = useCallback(async ({ cepikResult } = {}) => {
     if (!data || !me) return;
     const normUrl = data.listingUrl;
     const snap = {
       ...stripDebug(data),
-      __source: "manual",
-      __isNew: false,
+      __source: "manual", __isNew: false, __archived: false,
       __firstSeenAt: new Date().toISOString(),
-      __lastSeenAt: new Date().toISOString(),
-      __archived: false,
+      __lastSeenAt:  new Date().toISOString(),
     };
-
-    // Check deduplication with auto-sourced entries
     try {
       const existRes = await apiFetch(`/searches/lookup/by-url?listing_url=${encodeURIComponent(normUrl)}`);
       if (existRes.ok) {
         const existRow = await existRes.json();
         if (existRow?.id && existRow.snapshot_json?.__source === "auto") {
-          // Already tracked in a filter group — just notify user
           setSaveMsg("Pojazd już jest w bazie (skanowanie automatyczne).");
           setSavedSearchId(existRow.id);
           return;
@@ -126,15 +144,15 @@ export default function App() {
       body: {
         listing_url: normUrl,
         snapshot_json: snap,
-        manual_vin: data.vin || null,
+        manual_vin:                data.vin               || null,
         manual_first_registration: data.firstRegistration || null,
-        manual_license_plate: data.licensePlate || null,
+        manual_license_plate:      data.licensePlate       || null,
         latest_verification: cepikResult ? {
-          technicalData:  cepikResult.technicalData  || {},
+          technicalData:    cepikResult.technicalData    || {},
           odometerReadings: cepikResult.odometerReadings || [],
-          events:         cepikResult.events         || [],
-          comparison:     cepikResult.comparison     || null,
-          meta:           cepikResult.meta           || {},
+          events:           cepikResult.events           || [],
+          comparison:       cepikResult.comparison       || null,
+          meta:             cepikResult.meta             || {},
         } : null,
       },
     });
@@ -146,10 +164,8 @@ export default function App() {
     }
   }, [data, me, setSaveMsg, setSavedSearchId]);
 
-  // ─── Open from history / DB ──────────────────────────────
-  const handleOpenHistoryItem = useCallback(async (id) => {
-    const row = await openHistoryItem(id);
-    if (!row) return;
+  // ─── Open helpers ─────────────────────────────────────────
+  const applyOpenedRecord = useCallback((row, source) => {
     setData(mergeSearchRecord(row));
     setSavedSearchId(row.id);
     setCepik(null); setCepikErr(null); setSaveMsg(null);
@@ -162,48 +178,44 @@ export default function App() {
         comparison:       row.latest_verification.comparison || null,
       });
     }
-    setHistoryOpen(false);
+    setOpenedFromSource(source);
     setMainTab("search");
-  }, [openHistoryItem, setData, setSavedSearchId, setCepik, setCepikErr, setSaveMsg]);
+  }, [setData, setSavedSearchId, setCepik, setCepikErr, setSaveMsg]);
+
+  const handleOpenHistoryItem = useCallback(async (id) => {
+    const row = await openHistoryItem(id);
+    if (!row) return;
+    applyOpenedRecord(row, "history");
+    setHistoryOpen(false);
+  }, [openHistoryItem, applyOpenedRecord]);
 
   const handleOpenDbItem = useCallback(async (id) => {
     const row = await openHistoryItem(id);
     if (!row) return;
-    setData(mergeSearchRecord(row));
-    setSavedSearchId(row.id);
-    setCepik(null); setCepikErr(null); setSaveMsg(null);
-    if (row.latest_verification?.normalized) {
-      setCepik({
-        technicalData:    row.latest_verification.normalized.technicalData    || {},
-        odometerReadings: row.latest_verification.normalized.odometerReadings || [],
-        events:           row.latest_verification.normalized.events           || [],
-        meta:             { fromHistory: true, cacheHit: row.latest_verification.cache_hit },
-        comparison:       row.latest_verification.comparison || null,
-      });
-    }
-    setMainTab("search");
+    applyOpenedRecord(row, "database");
     setSaveMsg("Otworzono z bazy pojazdów");
-  }, [openHistoryItem, setData, setSavedSearchId, setCepik, setCepikErr, setSaveMsg]);
+  }, [openHistoryItem, applyOpenedRecord, setSaveMsg]);
 
   const handleDeleteHistoryItem = useCallback(async (id) => {
     const deletedId = await deleteHistoryItem(id);
     if (deletedId && savedSearchId === deletedId) {
-      setSavedSearchId(null); setData(null); setCepik(null);
+      setSavedSearchId(null); setData(null); setCepik(null); setOpenedFromSource(null);
     }
     await loadHistory();
     setDbRefreshKey(k => k + 1);
   }, [deleteHistoryItem, savedSearchId, setSavedSearchId, setData, setCepik, loadHistory]);
 
-  const handleRunFilter = useCallback((filter) => {
-    if (isRunning) return;
-    startJob(filter);
-  }, [isRunning, startJob]);
+  const handleRunFilter    = useCallback((f) => { if (!isRunning) startJob(f); }, [isRunning, startJob]);
+  const handleBackToSource = useCallback(() => {
+    if (openedFromSource === "database") setMainTab("database");
+    else if (openedFromSource === "history") setHistoryOpen(true);
+    setOpenedFromSource(null);
+  }, [openedFromSource]);
 
-  const combinedNotice = uxNotice || (uxNoticeGlobal ? uxNoticeGlobal : null);
+  const combinedNotice = uxNotice || uxNoticeGlobal || null;
 
   return (
     <div className="app">
-      {/* ─── HEADER ─── */}
       <header className="hdr">
         <div className="hdr-hex">VX</div>
         <div>
@@ -219,11 +231,9 @@ export default function App() {
         />
       </header>
 
-      {/* ─── MAIN NAV ─── */}
       <nav className="main-nav">
         {MAIN_TABS.map(tab => (
-          <button
-            key={tab.key} type="button"
+          <button key={tab.key} type="button"
             className={`main-nav-tab ${mainTab === tab.key ? "main-nav-tab--active" : ""}`}
             onClick={() => setMainTab(tab.key)}
           >
@@ -233,64 +243,78 @@ export default function App() {
             )}
           </button>
         ))}
+        <button type="button" className="main-nav-help-btn" onClick={() => setHelpOpen(true)} title="Skróty klawiszowe (?)">?</button>
       </nav>
 
-      {/* ─── HISTORY DRAWER ─── */}
       <HistoryDrawer
         open={historyOpen} onClose={() => setHistoryOpen(false)}
-        history={history} histLoading={histLoading} histVerifyBusy={histVerifyBusy}
-        me={me}
-        onOpenItem={handleOpenHistoryItem}
-        onDeleteItem={handleDeleteHistoryItem}
-        onPatchItem={patchHistoryItem}
-        onVerifyItem={verifyHistoryItem}
+        history={history} histLoading={histLoading} histVerifyBusy={histVerifyBusy} me={me}
+        onOpenItem={handleOpenHistoryItem} onDeleteItem={handleDeleteHistoryItem}
+        onPatchItem={patchHistoryItem} onVerifyItem={verifyHistoryItem}
       />
 
-      {/* ─── MAIN CONTENT ─── */}
-      <div className="main">
+      <ScanHistoryDrawer
+        open={scanHistOpen} onClose={() => setScanHistOpen(false)}
+        scanHistory={scanHistory} onClear={clearScanHistory}
+      />
 
+      <KeyboardHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {sessionExpired && (
+        <SessionExpiredModal
+          authEmail={authEmail} setAuthEmail={setAuthEmail}
+          authPass={authPass}   setAuthPass={setAuthPass}
+          authErr={authErr} login={login}
+          onLogin={async () => { setSessionExpired(false); await refreshMe(); }}
+          onDismiss={() => setSessionExpired(false)}
+        />
+      )}
+
+      <div className="main">
         {mainTab === "search" && (
           <>
             <StatusBanner notice={combinedNotice} />
+            {openedFromSource && data && (
+              <button type="button" className="back-to-source-btn" onClick={handleBackToSource}>
+                ← {openedFromSource === "database" ? "Wróć do bazy pojazdów" : "Wróć do historii"}
+              </button>
+            )}
             <div className="input-area">
               <div className="section-label">URL ogłoszenia</div>
               <div className="input-wrap">
-                <input
-                  className="url-in"
+                <input ref={urlInputRef} className="url-in"
                   placeholder="https://www.otomoto.pl/osobowe/oferta/..."
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && !loading && run()}
-                />
+                  value={url} onChange={e => setUrl(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !loading && handleRun()} />
                 {portal !== "unknown" && (
                   <div className={`portal-chip ${portal}`}>{portal.toUpperCase()}.PL</div>
                 )}
-                <button type="button" className="go-btn" onClick={run} disabled={loading || !url.trim()}>
+                <button type="button" className="go-btn" onClick={handleRun} disabled={loading || !url.trim()}>
                   {loading ? "···" : "ANALIZUJ"}
                 </button>
               </div>
               <div className="hint">
                 Obsługiwane: otomoto.pl <span className="hint-dot">·</span> olx.pl
                 <span className="hint-dot">·</span> Działa przez r.jina.ai
+                <span className="hint-dot">·</span>
+                <button type="button" className="hint-kbd-btn" onClick={() => setHelpOpen(true)}>skróty klawiszowe</button>
               </div>
             </div>
-
+            <WorkflowProgress data={data} cepik={cepik} savedSearchId={savedSearchId} />
             {loading && <SkeletonResult />}
-
             {error && (
               <div className="err">
                 <span className="err-ico">⚠</span>
                 <div><strong>Błąd</strong> — {error}</div>
               </div>
             )}
-
+            {!loading && !data && !error && <SearchEmptyState />}
             {data && (
               <ResultCard
                 data={data} cepik={cepik}
                 savedSearchId={savedSearchId} saveMsg={saveMsg} saveBusy={saveBusy}
                 me={me} cepikLoading={cepikLoading} cepikErr={cepikErr} vinLoading={vinLoading}
-                onUpdateField={updateField} onVerify={verifyGov}
-                onSave={saveManualToDb}
+                onUpdateField={updateField} onVerify={verifyGov} onSave={saveManualToDb}
               />
             )}
           </>
@@ -298,24 +322,18 @@ export default function App() {
 
         {mainTab === "filters" && (
           <FiltersTab
-            filters={filters} isJobRunning={isRunning}
-            currentJobFilterId={job?.filterId}
-            onAdd={addFilter} onRemove={removeFilter} onRun={handleRunFilter}
-            me={me}
+            filters={filters} isJobRunning={isRunning} currentJobFilterId={job?.filterId}
+            onAdd={addFilter} onRemove={removeFilter} onUpdate={updateFilter}
+            onRun={handleRunFilter} me={me}
           />
         )}
 
         {mainTab === "database" && (
-          <VehicleDatabaseTab
-            key={dbRefreshKey}
-            me={me}
-            onOpenItem={handleOpenDbItem}
-            filters={filters}
-          />
+          <VehicleDatabaseTab key={dbRefreshKey} me={me} onOpenItem={handleOpenDbItem} filters={filters} />
         )}
       </div>
 
-      <BackgroundJobOverlay job={job} onCancel={cancelJob} />
+      <BackgroundJobOverlay job={job} onCancel={cancelJob} onViewHistory={() => setScanHistOpen(true)} />
     </div>
   );
 }
