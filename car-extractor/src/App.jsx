@@ -4,6 +4,7 @@ import "./styles/additions.css";
 import "./styles/phase-enhancements.css";
 import "./styles/phase-enhancements-p4-7.css";
 import "./styles/phase-enhancements-p8-10.css";
+import "./styles/phase-vdb-improvements.css";
 
 import { useAuth } from "./hooks/useAuth.js";
 import { useSearch } from "./hooks/useSearch.js";
