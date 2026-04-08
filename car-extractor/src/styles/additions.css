@@ -1247,6 +1247,7 @@
   user-select: none;
   transition: background 0.15s;
   flex-wrap: wrap;
+  min-height: 48px;  /* Ensure minimum height */
 }
 
 .vdb-group-hdr:hover { background: var(--card); }

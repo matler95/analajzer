@@ -412,10 +412,56 @@ export function parseMd(md, url) {
 
   const generation = extractGeneration(md, kv);
 
-  const priceRaw = field(md, "Cena", "Price");
-  const price = priceRaw
-    ? toNum(priceRaw.replace(/\s*(PLN|zł|EUR|USD).*/i, ""))
-    : findNumUnit(md, "(?:PLN|zł)");
+  // ── price ────────────────────────────────────────────────
+  // Priority 1: Look for KV/field matches (Otomoto structured data)
+  let priceRaw = field(md, "Cena", "Price");
+  
+  // Priority 2: Portal-agnostic heading pattern (entire document)
+  // Works for both OLX ("### 45 000 zł" or "#### 38 700 zł") and Otomoto ("### 26 900")
+  // OLX places price after model heading, so search entire doc and pick last valid match
+  if (!priceRaw) {
+    // Find ALL heading patterns with numbers in the entire document
+    const allMatches = [...md.matchAll(/#{2,4}\s+(\d[\d\s.,\u00a0]*)/g)];
+    
+    if (allMatches.length > 0) {
+      // Filter to valid prices (1000-10M PLN range) and get the LAST one
+      // (typically the main price comes after model/title headers)
+      for (let i = allMatches.length - 1; i >= 0; i--) {
+        const candidate = allMatches[i][1];
+        const candidateNum = toNum(candidate);
+        if (candidateNum && candidateNum >= 1000 && candidateNum < 10000000) {
+          priceRaw = candidate;
+          break;
+        }
+      }
+    }
+  }
+  
+  // Priority 3: Parse the extracted price
+  let price = null;
+  if (priceRaw) {
+    price = toNum(priceRaw.replace(/\s*(PLN|zł|EUR|USD).*/i, ""));
+  } else {
+    // Priority 4: Fallback - scan for numbers with currency, avoiding ads
+    // Look through entire doc but skip very small amounts (ads/financing)
+    const allMatches = [...md.matchAll(/([0-9][\d\s.,\u00a0]*)\s*(?:zł|PLN)/gi)];
+    if (allMatches.length > 0) {
+      let bestPrice = null;
+      let bestNum = 0;
+      for (const m of allMatches) {
+        const candidateNum = toNum(m[1]);
+        if (candidateNum && candidateNum >= 1000 && candidateNum < 10000000) {
+          // Prefer higher prices (actual listing prices > loan examples)
+          if (candidateNum > bestNum) {
+            bestNum = candidateNum;
+            bestPrice = candidateNum;
+          }
+        }
+      }
+      price = bestPrice;
+    }
+  }
+  
   const currency = /\bEUR\b/.test(md.slice(0, 3000)) ? "EUR" : "PLN";
 
   const year =

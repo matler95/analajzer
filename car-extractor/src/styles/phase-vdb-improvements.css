@@ -38,11 +38,13 @@
 
 .vdb-group-hdr--sticky {
   position: sticky;
-  top: 100px;  /* below the two fixed headers (app hdr + main nav) */
+  top: 0;  /* Stick at viewport top to stay visible when scrolling */
   z-index: 30;
   background: var(--card2);
   backdrop-filter: blur(8px);
-  /* Override the default cursor on the sticky header strip */
+  flex-wrap: nowrap;  /* Prevent wrapping that causes height changes */
+  height: 48px;       /* Fixed height for consistency */
+  overflow: hidden;   /* Ensure nothing overflows the sticky bar */
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -729,3 +731,175 @@
   .vdb-sort-select     { display: none; } /* Sort via global controls on mobile */
   .cmp-table           { min-width: 360px; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PRICE CHANGE BADGE
+   Shown on thumbnail, pill area, and compact/grid views.
+   Drop = green (good news), Rise = red (bad news).
+   ═══════════════════════════════════════════════════════════ */
+
+.price-change-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Drop — green: price fell, that's good for the buyer */
+.price-change-badge--drop {
+  background: rgba(61, 184, 122, 0.18);
+  color: #7fffbe;
+  border: 1px solid rgba(61, 184, 122, 0.45);
+}
+
+/* Rise — red: price went up */
+.price-change-badge--rise {
+  background: rgba(224, 69, 69, 0.15);
+  color: #ffb0b0;
+  border: 1px solid rgba(224, 69, 69, 0.45);
+}
+
+/* Compact variant: smaller, fits on the thumbnail overlay */
+.price-change-badge--compact {
+  font-size: 8px;
+  padding: 2px 5px;
+  border-radius: 2px;
+}
+
+/* When overlaid on the thumbnail (list & compact views) */
+.vdbc-thumb .price-change-badge--compact,
+.vdbc-compact-thumb .price-change-badge--compact {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+}
+
+/* Grid view: badge inside top-row overlay */
+.vdbc-grid-top-row .price-change-badge--compact {
+  position: static;
+  backdrop-filter: blur(4px);
+}
+
+/* ── Card border highlight when price changed ── */
+.vdbc--price-changed {
+  border-left: 3px solid #3db87a;
+}
+
+.vdbc-compact--price-changed {
+  border-left: 3px solid #3db87a;
+}
+
+.vdbc-grid-card--price-changed {
+  border-left: 3px solid #3db87a;
+}
+
+/* Rise-specific override (border red) */
+.vdbc--price-changed.vdbc--price-rise,
+.vdbc-compact--price-changed.vdbc-compact--price-rise,
+.vdbc-grid-card--price-changed.vdbc-grid-card--price-rise {
+  border-left-color: var(--red);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GROUP HEADER — price-change badge
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-gbadge--price {
+  background: rgba(61, 184, 122, 0.12);
+  color: #7fffbe;
+  border: 1px solid rgba(61, 184, 122, 0.35);
+  font-family: var(--ff-m);
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER PILL — price_changed
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-pill--price_changed {
+  color: #7fffbe;
+  border-color: rgba(61, 184, 122, 0.35);
+  background: rgba(61, 184, 122, 0.06);
+}
+
+.vdb-pill--price_changed:hover {
+  border-color: rgba(61, 184, 122, 0.7);
+  color: #7fffbe;
+  background: rgba(61, 184, 122, 0.12);
+}
+
+.vdb-pill--price_changed.vdb-pill--active {
+  border-color: #3db87a;
+  color: #7fffbe;
+  background: rgba(61, 184, 122, 0.18);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOTAL BAR — price-change count
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-total-price-changed {
+  color: #7fffbe;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EXPANDED — price-change inline label in section header
+   ═══════════════════════════════════════════════════════════ */
+
+.vdbc-price-change-inline {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 8px;
+}
+
+.vdbc-price-change-inline--drop {
+  color: #7fffbe;
+  background: rgba(61, 184, 122, 0.15);
+  border: 1px solid rgba(61, 184, 122, 0.4);
+}
+
+.vdbc-price-change-inline--rise {
+  color: #ffb0b0;
+  background: rgba(224, 69, 69, 0.12);
+  border: 1px solid rgba(224, 69, 69, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PRICE HISTORY CHAIN — arrows between entries
+   ═══════════════════════════════════════════════════════════ */
+
+.vdbc-chain-arrow {
+  font-size: 9px;
+  font-family: var(--ff-m);
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.vdbc-chain-item {
+  position: relative; /* needed for absolute arrow child */
+}
+
+.vdbc-chain-arrow--drop { color: #7fffbe; }
+.vdbc-chain-arrow--rise { color: #ffb0b0; }

@@ -13,6 +13,11 @@ import {
 
 const DELAY_MS      = 2500;
 const MAX_PAGES_AUTO = 12;
+// Maximum number of historical price entries kept per vehicle.
+const MAX_PRICE_HISTORY = 20;
+// After this many milliseconds with no further price change, clear __priceDiff
+// so stale "▼ 5 000 PLN" badges don't persist across unrelated future scans.
+const PRICE_CHANGE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -124,13 +129,10 @@ export function useBackgroundJob({ me, onJobComplete }) {
       }
 
       // ── Phase B: archive detection ───────────────────────────
-      // Mark as archived any listing that was previously saved by THIS filter
-      // but didn't appear in the current scrape run.
       try {
         const allRes = await apiFetch("/searches");
         if (allRes.ok) {
           const allSaved = await allRes.json();
-          // Only consider rows saved by this exact filter (not by other filters)
           const filterSaved = allSaved.filter(r =>
             r.snapshot_json?.__filterId === filter.id &&
             r.snapshot_json?.__source   === "auto"
@@ -185,25 +187,13 @@ export function useBackgroundJob({ me, onJobComplete }) {
             const existSnap = existingRow.snapshot_json || {};
 
             // ─────────────────────────────────────────────────────
-            // FIX: Filter overlap handling
-            //
-            // Case 1 — Same filter already saved this URL:
-            //   Update __lastSeenAt, un-archive, do price-change detection.
-            //
-            // Case 2 — DIFFERENT filter (or manual) saved this URL:
-            //   Do NOT overwrite __filterName/__filterId — the listing
-            //   already belongs to another filter group. Just update
-            //   __lastSeenAt so both filters know it's still live.
-            //   Count it as skipped for THIS filter.
-            //
-            // This prevents listings from "jumping" filter groups
-            // every time a later scan runs and overwrites __filterName.
+            // Filter overlap handling:
+            //   Same filter  → price-change detection + __lastSeenAt refresh
+            //   Other filter → touch __lastSeenAt only; don't overwrite ownership
             // ─────────────────────────────────────────────────────
-
             const sameFilter = existSnap.__filterId === filter.id;
 
             if (!sameFilter) {
-              // Belongs to a different filter or manual entry — touch __lastSeenAt only.
               try {
                 await apiFetch(`/searches/${existingRow.id}`, {
                   method: "PATCH",
@@ -230,19 +220,36 @@ export function useBackgroundJob({ me, onJobComplete }) {
               const car = parseMd(md, normUrl);
 
               if (car.price && oldPrice && Math.abs(car.price - oldPrice) > 100) {
+                // ── Price changed ─────────────────────────────────
                 priceChanges++;
-                const priceDiff = car.price - oldPrice;
+                const priceDiff = car.price - oldPrice; // negative = drop, positive = rise
+
+                // Accumulate history, capped at MAX_PRICE_HISTORY entries so the
+                // snapshot_json column doesn't grow without bound.
+                const prevHistory = Array.isArray(existSnap.__priceHistory)
+                  ? existSnap.__priceHistory
+                  : [];
+                const cappedHistory = [
+                  ...prevHistory,
+                  {
+                    price:      oldPrice,
+                    recordedAt: existSnap.__lastSeenAt || existingRow.created_at,
+                  },
+                ].slice(-MAX_PRICE_HISTORY);
+
                 await apiFetch(`/searches/${existingRow.id}`, {
                   method: "PATCH",
                   body: {
                     snapshot_json: {
                       ...existSnap,
                       price: car.price,
-                      __priceHistory: [
-                        ...(existSnap.__priceHistory || []),
-                        { price: oldPrice, recordedAt: existSnap.__lastSeenAt || existingRow.created_at },
-                      ],
-                      __priceDiff:  priceDiff,
+                      __priceHistory: cappedHistory,
+                      // Relative to the immediately previous price so the badge
+                      // always reflects the latest single move, not all-time delta.
+                      __priceDiff: priceDiff,
+                      // Timestamp used by the UI to know this change is "fresh"
+                      // and to auto-expire the badge after PRICE_CHANGE_TTL_MS.
+                      __priceChangedAt: new Date().toISOString(),
                       __lastSeenAt: new Date().toISOString(),
                       __archived:   false,
                       __isNew:      false,
@@ -251,11 +258,23 @@ export function useBackgroundJob({ me, onJobComplete }) {
                 });
                 setJob(prev => ({ ...prev, priceChanges }));
               } else {
+                // ── No price change this run ───────────────────────
+                // Clear __priceDiff / __priceChangedAt once the TTL expires so
+                // stale "▼ X PLN" badges don't persist indefinitely across future
+                // scans that return the same price.
+                const changedAt = existSnap.__priceChangedAt;
+                const isExpired =
+                  changedAt &&
+                  Date.now() - new Date(changedAt).getTime() > PRICE_CHANGE_TTL_MS;
+
                 await apiFetch(`/searches/${existingRow.id}`, {
                   method: "PATCH",
                   body: {
                     snapshot_json: {
                       ...existSnap,
+                      ...(isExpired
+                        ? { __priceDiff: null, __priceChangedAt: null }
+                        : {}),
                       __lastSeenAt: new Date().toISOString(),
                       __archived:   false,
                       __isNew:      false,
@@ -285,7 +304,9 @@ export function useBackgroundJob({ me, onJobComplete }) {
             __firstSeenAt: new Date().toISOString(),
             __lastSeenAt:  new Date().toISOString(),
             __archived:    false,
-            __priceHistory: [],
+            __priceHistory:    [],
+            __priceDiff:       null,
+            __priceChangedAt:  null,
           };
 
           // Try VIN via scraper for Otomoto (Playwright) if missing
@@ -302,8 +323,6 @@ export function useBackgroundJob({ me, onJobComplete }) {
           if (cancelRef.current) break;
 
           // ── Upgrade manual entry if it exists ───────────────
-          // If a user manually saved this URL before, upgrade it to auto
-          // tracking under this filter rather than creating a duplicate.
           let searchId = null;
           try {
             const manualRes = await apiFetch(
@@ -317,13 +336,16 @@ export function useBackgroundJob({ me, onJobComplete }) {
                   body: {
                     snapshot_json: {
                       ...manualRow.snapshot_json,
-                      __source:      "auto",
-                      __filterId:    filter.id,
-                      __filterName:  filter.name,
-                      __isNew:       true,
-                      __firstSeenAt: new Date().toISOString(),
-                      __lastSeenAt:  new Date().toISOString(),
-                      __archived:    false,
+                      __source:          "auto",
+                      __filterId:        filter.id,
+                      __filterName:      filter.name,
+                      __isNew:           true,
+                      __firstSeenAt:     new Date().toISOString(),
+                      __lastSeenAt:      new Date().toISOString(),
+                      __archived:        false,
+                      __priceHistory:    [],
+                      __priceDiff:       null,
+                      __priceChangedAt:  null,
                     },
                   },
                 });
@@ -331,7 +353,6 @@ export function useBackgroundJob({ me, onJobComplete }) {
                 newCount++;
                 processedCount++;
                 setJob(prev => ({ ...prev, newCount }));
-                // Fall through to CEPiK verification below
               }
             }
           } catch { /* silent */ }
