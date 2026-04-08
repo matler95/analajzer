@@ -1,6 +1,15 @@
 /**
  * Car listing parser — fetches via Jina AI and extracts structured data
  * from markdown output.
+ *
+ * CHANGELOG (bug fixes):
+ *  - enginePower:        Added "Moc silnika" (OLX label) and "Moc" partial match
+ *  - engineDisplacement: Added "Poj. silnika", "Pojemność silnika" (OLX labels)
+ *  - fuelType:           Added "Paliwo" (OLX label)
+ *  - extractMileage:     Replaced Math.max with priority-ordered selection.
+ *                        KV/structured data wins; findNumUnit fallback is only
+ *                        used when nothing else works, and values < 500 km are
+ *                        rejected (filter out power figures like "192km" in titles).
  */
 
 import { normalizeVin, isValidVin } from "./normalize.js";
@@ -182,17 +191,37 @@ function findNumUnit(md, unitRe) {
 }
 
 function extractMileage(md, kv) {
-  const candidates = [];
+  // Priority 1 — KV map (structured, most reliable)
   const kvMileage = fromKv(kv, "Przebieg", "Przebieg (km)", "Mileage");
-  if (kvMileage) candidates.push(toNum(kvMileage));
+  if (kvMileage) {
+    const n = toNum(kvMileage);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+
+  // Priority 2 — field() pattern matching
   const fieldMileage = field(md, "Przebieg", "Przebieg (km)", "Mileage");
-  if (fieldMileage) candidates.push(toNum(fieldMileage));
+  if (fieldMileage) {
+    const n = toNum(fieldMileage);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+
+  // Priority 3 — near-label regex (label case-insensitive, unit lowercase only)
   const nearLabel = md.match(/Przebieg[\s:|\-*]*\n?\s*([0-9][\d\s.,\u00a0]*(?:\s*tys\.?)?)\s*km\b/i);
-  if (nearLabel?.[1]) candidates.push(toNum(nearLabel[1]));
-  candidates.push(findNumUnit(md, "km\\b"));
-  const valid = candidates.filter(n => Number.isFinite(n));
-  if (!valid.length) return null;
-  return Math.max(...valid);
+  if (nearLabel?.[1]) {
+    const n = toNum(nearLabel[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+
+  // Priority 4 — last-resort scan. Lowercase-only "km" avoids matching "192KM"
+  // (horsepower) which appears as "192km" in OLX URL slugs. Threshold > 1000
+  // rules out HP values (50–700 range) misread from the slug.
+  const fallback = md.match(/\b([0-9][\d\s.,\u00a0]{0,15})\s*km(?![A-Z/])/);
+  if (fallback) {
+    const n = toNum(fallback[1]);
+    if (Number.isFinite(n) && n > 1000) return n;
+  }
+
+  return null;
 }
 
 function extractTitle(md) {
@@ -246,7 +275,6 @@ function extractDescription(md) {
   return null;
 }
 
-/** VIN must use letters (not only digits); excludes many numeric IDs. */
 function isLikelyVinFrame(s) {
   return isValidVin(s) && /[A-HJ-NPR-Z]/.test(s);
 }
@@ -333,56 +361,21 @@ function extractLocationFromMarkdown(md) {
   return null;
 }
 
-/**
- * Extract generation from otomoto Jina markdown.
- *
- * Otomoto renders generation as a labeled field in the spec table, e.g.:
- *   | Generacja | E46 (1998-2006) |
- *   Generacja  E46 (1998-2006)
- *   **Generacja** E46 (1998-2006)
- *
- * The value typically looks like:
- *   "E46 (1998-2006)"
- *   "F30/F31/F34/F35 (2011-2019)"
- *   "W205 (2013-2021)"
- *   "C/HR (2016-2023)"
- *   "Typ 8V (2012-2020)"
- *
- * We want the full string as-is from otomoto, not derived from year.
- */
 function extractGeneration(md, kv) {
-  // 1. Try KV map (most reliable — catches table and inline colon formats)
-  const fromKvRaw = fromKv(
-    kv,
-    "Generacja",
-    "Generation",
-    "generacja",
-  );
+  const fromKvRaw = fromKv(kv, "Generacja", "Generation", "generacja");
   if (fromKvRaw) return clean(fromKvRaw);
-
-  // 2. Try direct regex patterns in the markdown text
-  //    Handles: "Generacja  E46 (1998-2006)" with multiple spaces
-  //    and bold: "**Generacja** E46 (1998-2006)"
-  //    and table: "| Generacja | E46 (1998-2006) |"
   const patterns = [
-    // Table row: | Generacja | value |
     /\|\s*Generacja\s*\|\s*([^|\n]{2,80}?)\s*\|/i,
-    // Inline with colon: Generacja: E46 (1998-2006)
     /\bGeneracja\s*:\s*([^\n|*]{2,80})/i,
-    // Bold label then space: **Generacja** E46 (...)  or  *Generacja* E46
     /\*{1,2}Generacja\*{1,2}\s+([^\n*|]{2,80})/i,
-    // Plain label with multiple spaces (otomoto uses 2+ spaces as separator)
     /\bGeneracja\s{2,}([^\n|]{2,80})/i,
-    // Next-line format: label on one line, value on next
     /\bGeneracja\s*\n\s*([^\n#|*]{2,80})/i,
   ];
-
   for (const re of patterns) {
     const m = md.match(re);
     const val = clean(m?.[1]);
     if (val && !/^Generacja$/i.test(val)) return val;
   }
-
   return null;
 }
 
@@ -397,8 +390,16 @@ export function parseMd(md, url) {
   const tBrand = clean(titleTokens[0]);
   const tModel = clean(titleTokens[1]);
 
-  const brand = clean(fromKv(kv, "Marka pojazdu", "Marka", "Make") ?? field(md, "Marka pojazdu", "Marka", "Make") ?? tBrand);
-  const model = clean(fromKv(kv, "Model pojazdu", "Model") ?? field(md, "Model pojazdu", "Model") ?? tModel);
+  const brand = clean(
+    fromKv(kv, "Marka pojazdu", "Marka", "Make") ??
+    field(md, "Marka pojazdu", "Marka", "Make") ??
+    tBrand
+  );
+  const model = clean(
+    fromKv(kv, "Model pojazdu", "Model") ??
+    field(md, "Model pojazdu", "Model") ??
+    tModel
+  );
 
   let variant = null;
   if (title && brand && model) {
@@ -409,7 +410,6 @@ export function parseMd(md, url) {
     if (v.length > 1 && v.length < 60) variant = v;
   }
 
-  // Extract generation — dedicated field separate from variant
   const generation = extractGeneration(md, kv);
 
   const priceRaw = field(md, "Cena", "Price");
@@ -417,9 +417,63 @@ export function parseMd(md, url) {
     ? toNum(priceRaw.replace(/\s*(PLN|zł|EUR|USD).*/i, ""))
     : findNumUnit(md, "(?:PLN|zł)");
   const currency = /\bEUR\b/.test(md.slice(0, 3000)) ? "EUR" : "PLN";
+
   const year =
     fieldNum(md, "Rok produkcji", "Rok", "Year") ??
     (() => { const m = md.match(/Rok\s+produkcji[^0-9]{0,20}([12]\d{3})/i); return m ? +m[1] : null; })();
+
+  // ── enginePower ──────────────────────────────────────────────
+  // OLX uses "Moc silnika" (normalizes to "moc silnika").
+  // Otomoto uses "Moc" (normalizes to "moc").
+  // We try both, plus a text-search for the label, plus findNumUnit fallback.
+  const enginePowerRaw =
+    fromKv(kv, "Moc silnika", "Moc", "Engine power", "Power") ??
+    field(md, "Moc silnika", "Moc", "Engine power", "Power");
+
+  let enginePower = null;
+  if (enginePowerRaw) {
+    // Strip unit suffix before parsing: "192 KM" → "192"
+    enginePower = toNum(
+      enginePowerRaw.replace(/\s*(KM|HP|kW|pk)\b.*/i, "").trim()
+    );
+  }
+  if (!enginePower) {
+    // Fallback: scan for a number followed by uppercase "KM" (horsepower in Polish).
+    // Case-sensitive — avoids matching lowercase "km" (mileage) that appears in OLX
+    // title slugs like "2.5 192km". Skip the first 300 chars (title / meta area).
+    const bodyText = md.slice(300);
+    const kmHit = bodyText.match(/([0-9][\d\s.,\u00a0]*)\s*KM\b/);
+    if (kmHit) enginePower = toNum(kmHit[1]);
+  }
+
+  // ── engineDisplacement ───────────────────────────────────────
+  // OLX uses "Poj. silnika" (normalizes to "poj silnika").
+  // Otomoto uses "Pojemność skokowa" or "Pojemność".
+  const engineDisplacementRaw =
+    fromKv(kv,
+      "Poj. silnika", "Poj silnika", "Pojemność silnika",
+      "Pojemność skokowa", "Pojemność", "Engine capacity",
+    ) ??
+    field(md,
+      "Poj. silnika", "Pojemność silnika",
+      "Pojemność skokowa", "Pojemność", "Engine capacity",
+    );
+
+  let engineDisplacement = null;
+  if (engineDisplacementRaw) {
+    engineDisplacement = toNum(
+      engineDisplacementRaw.replace(/\s*(cm[³3]|cc|ccm)\b.*/i, "").trim()
+    );
+  }
+  if (!engineDisplacement) {
+    engineDisplacement = findNumUnit(md, "cm[3³]");
+  }
+
+  // ── fuelType ─────────────────────────────────────────────────
+  // OLX uses "Paliwo" as the label.
+  const fuelType =
+    fromKv(kv, "Rodzaj paliwa", "Paliwo", "Fuel type") ??
+    field(md, "Rodzaj paliwa", "Paliwo", "Fuel type");
 
   const drivetrainKv    = fromKv(kv, "Napęd", "Rodzaj napędu", "Drive");
   const drivetrainField = field(md, "Napęd", "Rodzaj napędu", "Drive");
@@ -441,26 +495,30 @@ export function parseMd(md, url) {
 
   return {
     brand, model, variant,
-    generation,   // ← NEW: "E46 (1998-2006)" style string from otomoto
+    generation,
     year,
     price, currency,
     mileage: extractMileage(md, kv),
-    engineDisplacement:
-      fieldNum(fromKv(kv, "Pojemność skokowa", "Pojemność", "Engine capacity")) ??
-      fieldNum(md, "Pojemność skokowa", "Pojemność", "Engine capacity") ??
-      findNumUnit(md, "cm[3³]"),
-    enginePower:
-      fieldNum(fromKv(kv, "Moc", "Power")) ??
-      fieldNum(md, "Moc", "Power") ??
-      findNumUnit(md, "KM\\b"),
+    engineDisplacement,
+    enginePower,
     enginePowerUnit: "KM",
-    fuelType:     fromKv(kv, "Rodzaj paliwa", "Paliwo", "Fuel type") ?? field(md, "Rodzaj paliwa", "Paliwo", "Fuel type"),
-    transmission: fromKv(kv, "Skrzynia biegów", "Skrzynia", "Transmission", "Gearbox") ?? field(md, "Skrzynia biegów", "Skrzynia", "Transmission", "Gearbox"),
-    drivetrain:   drivetrainKv ?? drivetrainField,
-    bodyType:     fromKv(kv, "Typ nadwozia", "Nadwozie", "Body type") ?? field(md, "Typ nadwozia", "Nadwozie", "Body type"),
-    color:        fromKv(kv, "Kolor", "Kolor nadwozia", "Color") ?? field(md, "Kolor", "Kolor nadwozia", "Color"),
-    doors:        fieldNum(fromKv(kv, "Liczba drzwi", "Drzwi", "Doors")) ?? fieldNum(md, "Liczba drzwi", "Drzwi", "Doors"),
-    seats:        fieldNum(fromKv(kv, "Liczba miejsc", "Miejsca", "Seats")) ?? fieldNum(md, "Liczba miejsc", "Miejsca", "Seats"),
+    fuelType,
+    transmission:
+      fromKv(kv, "Skrzynia biegów", "Skrzynia", "Transmission", "Gearbox") ??
+      field(md, "Skrzynia biegów", "Skrzynia", "Transmission", "Gearbox"),
+    drivetrain: drivetrainKv ?? drivetrainField,
+    bodyType:
+      fromKv(kv, "Typ nadwozia", "Nadwozie", "Body type") ??
+      field(md, "Typ nadwozia", "Nadwozie", "Body type"),
+    color:
+      fromKv(kv, "Kolor", "Kolor nadwozia", "Color") ??
+      field(md, "Kolor", "Kolor nadwozia", "Color"),
+    doors:
+      fieldNum(fromKv(kv, "Liczba drzwi", "Drzwi", "Doors") ?? "") ??
+      fieldNum(md, "Liczba drzwi", "Drzwi", "Doors"),
+    seats:
+      fieldNum(fromKv(kv, "Liczba miejsc", "Miejsca", "Seats") ?? "") ??
+      fieldNum(md, "Liczba miejsc", "Miejsca", "Seats"),
     firstRegistration: cleanDate(firstRegistrationKv ?? firstRegistrationField),
     countryOfOrigin: clean(countryOfOriginKv ?? countryOfOriginField),
     licensePlate: licensePlateKv ?? licensePlateField,

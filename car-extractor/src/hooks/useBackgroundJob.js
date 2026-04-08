@@ -11,7 +11,7 @@ import {
   stripDebug,
 } from "../utils/normalize.js";
 
-const DELAY_MS = 2500;
+const DELAY_MS      = 2500;
 const MAX_PAGES_AUTO = 12;
 
 function sleep(ms) {
@@ -19,9 +19,9 @@ function sleep(ms) {
 }
 
 async function fetchAllListingUrls(searchUrl, cancelRef, onProgress) {
-  const allUrls = [];
+  const allUrls  = [];
   let currentUrl = searchUrl;
-  let pageNum = 0;
+  let pageNum    = 0;
 
   while (pageNum < MAX_PAGES_AUTO) {
     if (cancelRef.current) break;
@@ -38,7 +38,6 @@ async function fetchAllListingUrls(searchUrl, cancelRef, onProgress) {
       allUrls.push(...urls);
       pageNum++;
 
-      // Try to advance to next page
       try {
         const u = new URL(currentUrl);
         const cur = parseInt(u.searchParams.get("page") || "1", 10);
@@ -46,7 +45,7 @@ async function fetchAllListingUrls(searchUrl, cancelRef, onProgress) {
         currentUrl = u.toString();
       } catch { break; }
 
-      if (urls.length < 28) break; // last page
+      if (urls.length < 28) break;
       await sleep(600);
     } catch { break; }
   }
@@ -61,14 +60,14 @@ async function fetchAllListingUrls(searchUrl, cancelRef, onProgress) {
 }
 
 export function useBackgroundJob({ me, onJobComplete }) {
-  const [job, setJob] = useState(null);
-  const cancelRef = useRef(false);
-  const runningRef = useRef(false);
-  const filterIdRef = useRef(null);
+  const [job,        setJob]        = useState(null);
+  const cancelRef    = useRef(false);
+  const runningRef   = useRef(false);
+  const filterIdRef  = useRef(null);
 
   const startJob = useCallback(async (filter) => {
     if (!me || runningRef.current) return;
-    cancelRef.current = false;
+    cancelRef.current  = false;
     runningRef.current = true;
     filterIdRef.current = filter.id;
 
@@ -89,11 +88,10 @@ export function useBackgroundJob({ me, onJobComplete }) {
     let processedCount = 0, skippedCount = 0, cepikVerifiedCount = 0;
     let newCount = 0, archivedCount = 0, priceChanges = 0;
 
-    // Track all listing URLs found in this run for archive detection
     const foundUrls = new Set();
 
     try {
-      // ── Fetch all URLs across all batches first for archive detection ──
+      // ── Phase A: scrape all URLs ──────────────────────────────
       const allFoundUrls = [];
 
       for (let bi = 0; bi < searchUrls.length; bi++) {
@@ -125,27 +123,29 @@ export function useBackgroundJob({ me, onJobComplete }) {
         });
       }
 
-      // ── Detect archived (previously auto-saved, now not found) ──────
+      // ── Phase B: archive detection ───────────────────────────
+      // Mark as archived any listing that was previously saved by THIS filter
+      // but didn't appear in the current scrape run.
       try {
         const allRes = await apiFetch("/searches");
         if (allRes.ok) {
           const allSaved = await allRes.json();
+          // Only consider rows saved by this exact filter (not by other filters)
           const filterSaved = allSaved.filter(r =>
             r.snapshot_json?.__filterId === filter.id &&
-            r.snapshot_json?.__source === "auto"
+            r.snapshot_json?.__source   === "auto"
           );
           for (const saved of filterSaved) {
             const normUrl = normListingUrl(saved.listing_url);
             if (!foundUrls.has(normUrl)) {
-              // Mark as archived
               await apiFetch(`/searches/${saved.id}`, {
                 method: "PATCH",
                 body: {
                   snapshot_json: {
                     ...saved.snapshot_json,
-                    __archived: true,
+                    __archived:   true,
                     __archivedAt: new Date().toISOString(),
-                    __isNew: false,
+                    __isNew:      false,
                   },
                 },
               });
@@ -162,7 +162,7 @@ export function useBackgroundJob({ me, onJobComplete }) {
         phaseMsg: `Znaleziono ${allFoundUrls.length} ogłoszeń`,
       }));
 
-      // ── Process each listing ────────────────────────────────────────
+      // ── Phase C: process each listing ────────────────────────
       const dedupUrls = [...new Set(allFoundUrls.map(u => normListingUrl(u)))];
 
       for (let i = 0; i < dedupUrls.length; i++) {
@@ -174,28 +174,62 @@ export function useBackgroundJob({ me, onJobComplete }) {
         }));
 
         try {
-          // Check if already exists
+          // ── Check if the URL is already in the database ──────
           const existingRes = await apiFetch(
             `/searches/lookup/by-url?listing_url=${encodeURIComponent(normUrl)}`
           );
           let existingRow = null;
-          if (existingRes.ok) {
-            existingRow = await existingRes.json();
-          }
+          if (existingRes.ok) existingRow = await existingRes.json();
 
-          if (existingRow && existingRow.id) {
+          if (existingRow?.id) {
             const existSnap = existingRow.snapshot_json || {};
 
-            // Price change detection
-            const oldPrice = existSnap.price;
-            let priceChanged = false;
+            // ─────────────────────────────────────────────────────
+            // FIX: Filter overlap handling
+            //
+            // Case 1 — Same filter already saved this URL:
+            //   Update __lastSeenAt, un-archive, do price-change detection.
+            //
+            // Case 2 — DIFFERENT filter (or manual) saved this URL:
+            //   Do NOT overwrite __filterName/__filterId — the listing
+            //   already belongs to another filter group. Just update
+            //   __lastSeenAt so both filters know it's still live.
+            //   Count it as skipped for THIS filter.
+            //
+            // This prevents listings from "jumping" filter groups
+            // every time a later scan runs and overwrites __filterName.
+            // ─────────────────────────────────────────────────────
 
-            // Re-fetch to detect price changes (lightweight check)
+            const sameFilter = existSnap.__filterId === filter.id;
+
+            if (!sameFilter) {
+              // Belongs to a different filter or manual entry — touch __lastSeenAt only.
+              try {
+                await apiFetch(`/searches/${existingRow.id}`, {
+                  method: "PATCH",
+                  body: {
+                    snapshot_json: {
+                      ...existSnap,
+                      __lastSeenAt: new Date().toISOString(),
+                      __archived:   false,
+                      __isNew:      false,
+                    },
+                  },
+                });
+              } catch { /* silent */ }
+              skippedCount++;
+              setJob(prev => ({ ...prev, skipped: skippedCount }));
+              await sleep(300);
+              continue;
+            }
+
+            // Same filter — check for price change and refresh __lastSeenAt
+            const oldPrice = existSnap.price;
             try {
-              const md = await fetchPage(normUrl);
+              const md  = await fetchPage(normUrl);
               const car = parseMd(md, normUrl);
+
               if (car.price && oldPrice && Math.abs(car.price - oldPrice) > 100) {
-                priceChanged = true;
                 priceChanges++;
                 const priceDiff = car.price - oldPrice;
                 await apiFetch(`/searches/${existingRow.id}`, {
@@ -208,24 +242,23 @@ export function useBackgroundJob({ me, onJobComplete }) {
                         ...(existSnap.__priceHistory || []),
                         { price: oldPrice, recordedAt: existSnap.__lastSeenAt || existingRow.created_at },
                       ],
-                      __priceDiff: priceDiff,
+                      __priceDiff:  priceDiff,
                       __lastSeenAt: new Date().toISOString(),
-                      __archived: false,
-                      __isNew: false,
+                      __archived:   false,
+                      __isNew:      false,
                     },
                   },
                 });
                 setJob(prev => ({ ...prev, priceChanges }));
               } else {
-                // Just mark as seen and not archived
                 await apiFetch(`/searches/${existingRow.id}`, {
                   method: "PATCH",
                   body: {
                     snapshot_json: {
                       ...existSnap,
                       __lastSeenAt: new Date().toISOString(),
-                      __archived: false,
-                      __isNew: false,
+                      __archived:   false,
+                      __isNew:      false,
                     },
                   },
                 });
@@ -238,24 +271,24 @@ export function useBackgroundJob({ me, onJobComplete }) {
             continue;
           }
 
-          // New listing — fetch full data
-          const md = await fetchPage(normUrl);
+          // ── New listing — fetch full data ──────────────────
+          const md  = await fetchPage(normUrl);
           const car = parseMd(md, normUrl);
           car.listingUrl = normUrl;
 
           const snapshot = {
             ...stripDebug(car),
-            __source: "auto",
-            __filterId: filter.id,
-            __filterName: filter.name,
-            __isNew: true,
+            __source:      "auto",
+            __filterId:    filter.id,
+            __filterName:  filter.name,
+            __isNew:       true,
             __firstSeenAt: new Date().toISOString(),
-            __lastSeenAt: new Date().toISOString(),
-            __archived: false,
+            __lastSeenAt:  new Date().toISOString(),
+            __archived:    false,
             __priceHistory: [],
           };
 
-          // Try VIN via scraper if missing
+          // Try VIN via scraper for Otomoto (Playwright) if missing
           if (!car.vin && /otomoto\.pl/i.test(normUrl)) {
             try {
               const vinRes = await apiFetch(`/scraper/vin?listing_url=${encodeURIComponent(normUrl)}`);
@@ -268,7 +301,10 @@ export function useBackgroundJob({ me, onJobComplete }) {
 
           if (cancelRef.current) break;
 
-          // Check if this URL exists in ręczne wyszukiwanie (manual source) — deduplicate
+          // ── Upgrade manual entry if it exists ───────────────
+          // If a user manually saved this URL before, upgrade it to auto
+          // tracking under this filter rather than creating a duplicate.
+          let searchId = null;
           try {
             const manualRes = await apiFetch(
               `/searches/lookup/by-url?listing_url=${encodeURIComponent(normUrl)}`
@@ -276,67 +312,68 @@ export function useBackgroundJob({ me, onJobComplete }) {
             if (manualRes.ok) {
               const manualRow = await manualRes.json();
               if (manualRow?.id && manualRow.snapshot_json?.__source === "manual") {
-                // Upgrade manual to auto (keep data, change source/filter)
                 await apiFetch(`/searches/${manualRow.id}`, {
                   method: "PATCH",
                   body: {
                     snapshot_json: {
                       ...manualRow.snapshot_json,
-                      __source: "auto",
-                      __filterId: filter.id,
-                      __filterName: filter.name,
-                      __isNew: true,
+                      __source:      "auto",
+                      __filterId:    filter.id,
+                      __filterName:  filter.name,
+                      __isNew:       true,
                       __firstSeenAt: new Date().toISOString(),
-                      __lastSeenAt: new Date().toISOString(),
-                      __archived: false,
+                      __lastSeenAt:  new Date().toISOString(),
+                      __archived:    false,
                     },
                   },
                 });
+                searchId = manualRow.id;
                 newCount++;
                 processedCount++;
                 setJob(prev => ({ ...prev, newCount }));
-                continue;
+                // Fall through to CEPiK verification below
               }
             }
           } catch { /* silent */ }
 
-          // Save new listing
-          let searchId = null;
-          const saveRes = await apiFetch("/searches", {
-            method: "POST",
-            body: {
-              listing_url: normUrl,
-              snapshot_json: snapshot,
-              manual_vin: car.vin || null,
-              manual_first_registration: car.firstRegistration || null,
-              manual_license_plate: car.licensePlate || null,
-            },
-          });
-          if (saveRes.ok) {
-            const saved = await saveRes.json();
-            searchId = saved.id;
-            newCount++;
-            setJob(prev => ({ ...prev, newCount }));
+          // ── Save new listing ──────────────────────────────
+          if (!searchId) {
+            const saveRes = await apiFetch("/searches", {
+              method: "POST",
+              body: {
+                listing_url:               normUrl,
+                snapshot_json:             snapshot,
+                manual_vin:                car.vin               || null,
+                manual_first_registration: car.firstRegistration || null,
+                manual_license_plate:      car.licensePlate       || null,
+              },
+            });
+            if (saveRes.ok) {
+              const saved = await saveRes.json();
+              searchId = saved.id;
+              newCount++;
+              setJob(prev => ({ ...prev, newCount }));
+            }
           }
 
           if (cancelRef.current) break;
 
-          // CEPiK verification
+          // ── CEPiK verification ────────────────────────────
           const plate = normalizeLicensePlate(car.licensePlate || "");
-          const vin = normalizeVin(car.vin || "");
-          const fr = normalizeDateForCepik(car.firstRegistration || "");
+          const vin   = normalizeVin(car.vin || "");
+          const fr    = normalizeDateForCepik(car.firstRegistration || "");
 
           if (searchId && isValidLicensePlate(plate) && isValidVin(vin) && fr) {
             try {
               const cepikRes = await apiFetch("/cepik/verify", {
                 method: "POST",
                 body: {
-                  search_id: searchId,
-                  registration_number: plate,
-                  vin_number: vin,
+                  search_id:            searchId,
+                  registration_number:  plate,
+                  vin_number:           vin,
                   first_registration_date: fr,
-                  listing_snapshot: snapshot,
-                  force_refresh: false,
+                  listing_snapshot:     snapshot,
+                  force_refresh:        false,
                 },
               });
               if (cepikRes.ok) {
