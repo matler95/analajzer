@@ -270,7 +270,7 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
         <div className="vdbc-info">
           <div className="vdbc-title">{title}{viewed&&<span className="vdbc-viewed-dot" title="Oglądany"/>}</div>
           {specParts.length>0&&<div className="vdbc-spec-line">{specParts.join(" · ")}</div>}
-          {s.__filterName&&<div className="vdbc-filter-tag">{s.__filterName}</div>}
+          {(s.__filterNames?.length > 0 || s.__filterName) && <div className="vdbc-filter-tag">{(s.__filterNames || [s.__filterName]).filter(Boolean).join(", ")}</div>}
           {note&&<div className="vdbc-note-preview">📝 {note}</div>}
           <div className="vdbc-pills">
             <StatusBadge status={cepikStatus}/>
@@ -551,7 +551,28 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
   const handleBatchVerify=useCallback(async()=>{if(!verifiableSelectedIds.length)return;setBatchVerifyBusy(true);for(const id of verifiableSelectedIds){const row=vehicles.find(v=>v.id===id);if(row)await handleVerify(row);await new Promise(r=>setTimeout(r,800));}setBatchVerifyBusy(false);setSelectedIds(new Set());},[verifiableSelectedIds,vehicles,handleVerify]);
 
   const grouped=useMemo(()=>{
-    const g={};for(const v of filtered){const src=v.snapshot_json?.__source;const key=src==="manual"?"__manual":(v.snapshot_json?.__filterName||"__none");if(!g[key])g[key]=[];g[key].push(v);}
+    const g={};
+    for(const v of filtered){
+      const src=v.snapshot_json?.__source;
+      if(src==="manual"){
+        if(!g["__manual"]) g["__manual"]=[];
+        g["__manual"].push(v);
+      } else {
+        // Get all filter names this vehicle appears in
+        const filterNames = v.snapshot_json?.__filterNames || [v.snapshot_json?.__filterName].filter(Boolean);
+        if(filterNames.length > 0){
+          // Add vehicle to each filter group it appears in
+          for(const filterName of filterNames){
+            if(!g[filterName]) g[filterName]=[];
+            g[filterName].push(v);
+          }
+        } else {
+          // Vehicle without filter assignment
+          if(!g["__none"]) g["__none"]=[];
+          g["__none"].push(v);
+        }
+      }
+    }
     return Object.entries(g).sort(([a],[b])=>{if(a==="__manual")return 1;if(b==="__manual")return-1;if(a==="__none")return 1;if(b==="__none")return-1;return a.localeCompare(b,"pl");});
   },[filtered]);
 

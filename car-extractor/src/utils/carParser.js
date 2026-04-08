@@ -10,6 +10,9 @@
  *                        KV/structured data wins; findNumUnit fallback is only
  *                        used when nothing else works, and values < 500 km are
  *                        rejected (filter out power figures like "192km" in titles).
+ *  - price extraction:   Now searches entire document for heading patterns.
+ *                        Handles OLX price placement after model heading.
+ *                        Picks last valid match in 1000-10M PLN range.
  */
 
 import { normalizeVin, isValidVin } from "./normalize.js";

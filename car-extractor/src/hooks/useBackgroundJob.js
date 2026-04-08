@@ -189,20 +189,25 @@ export function useBackgroundJob({ me, onJobComplete }) {
             // ─────────────────────────────────────────────────────
             // Filter overlap handling:
             //   Same filter  → price-change detection + __lastSeenAt refresh
-            //   Other filter → touch __lastSeenAt only; don't overwrite ownership
+            //   Other filter → add to __filterNames list, refresh __lastSeenAt
             // ─────────────────────────────────────────────────────
             const sameFilter = existSnap.__filterId === filter.id;
 
             if (!sameFilter) {
+              // Track all filters that have found this vehicle
+              const existingFilterNames = new Set(existSnap.__filterNames || [existSnap.__filterName].filter(Boolean));
+              existingFilterNames.add(filter.name);
+              
               try {
                 await apiFetch(`/searches/${existingRow.id}`, {
                   method: "PATCH",
                   body: {
                     snapshot_json: {
                       ...existSnap,
-                      __lastSeenAt: new Date().toISOString(),
-                      __archived:   false,
-                      __isNew:      false,
+                      __filterNames:  [...existingFilterNames],  // Track all filters
+                      __lastSeenAt:   new Date().toISOString(),
+                      __archived:     false,
+                      __isNew:        false,
                     },
                   },
                 });
@@ -300,6 +305,7 @@ export function useBackgroundJob({ me, onJobComplete }) {
             __source:      "auto",
             __filterId:    filter.id,
             __filterName:  filter.name,
+            __filterNames: [filter.name],  // Track all filters this vehicle appears in
             __isNew:       true,
             __firstSeenAt: new Date().toISOString(),
             __lastSeenAt:  new Date().toISOString(),
@@ -339,6 +345,7 @@ export function useBackgroundJob({ me, onJobComplete }) {
                       __source:          "auto",
                       __filterId:        filter.id,
                       __filterName:      filter.name,
+                      __filterNames:     [filter.name],
                       __isNew:           true,
                       __firstSeenAt:     new Date().toISOString(),
                       __lastSeenAt:      new Date().toISOString(),
