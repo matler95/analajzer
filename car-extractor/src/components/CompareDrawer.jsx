@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 
 const ROWS = [
   { key: "price",       label: "Cena",         fmt: (v, s) => s.price ? `${Number(s.price).toLocaleString("pl-PL")} ${s.currency || "PLN"}` : "—" },
@@ -31,15 +31,22 @@ function bestValue(rows, rowKey, vehicles) {
     return null;
   });
   if (vals.every(v => v === null)) return null;
-  // Lower is better for price/mileage, higher for power/year
   const higherBetter = rowKey === "power" || rowKey === "year";
   const valid = vals.filter(v => v !== null);
   const best  = higherBetter ? Math.max(...valid) : Math.min(...valid);
   return vals.map(v => v === best ? "best" : v !== null ? "normal" : "none");
 }
 
+// FIX #7: Added Escape key handler — all other drawers/modals handle Escape,
+// CompareDrawer was the only one missing it.
 export default function CompareDrawer({ vehicles, onClose, onRemove, onOpen }) {
   const cols = vehicles.slice(0, 3);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   const highlights = useMemo(() => {
     const result = {};
@@ -94,7 +101,6 @@ export default function CompareDrawer({ vehicles, onClose, onRemove, onOpen }) {
                   </th>
                 );
               })}
-              {/* Empty slot placeholder if < 3 */}
               {cols.length < 3 && (
                 <th className="cmp-th cmp-th--empty">
                   <div className="cmp-empty-slot">

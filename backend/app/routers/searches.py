@@ -115,6 +115,46 @@ def create_search(
     return s
 
 
+# FIX #4: /lookup/by-url MUST be declared before /{search_id} to prevent
+# FastAPI from matching "lookup" as a search_id and returning 422.
+@router.get("/lookup/by-url", response_model=schemas.SearchDetailOut | None)
+def get_search_by_url(
+    listing_url: str,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    norm = _norm_url(listing_url)
+    s = db.query(models.Search).filter(models.Search.user_id == user.id, models.Search.listing_url == norm).first()
+    if not s:
+        return None
+    latest = (
+        db.query(models.CepikVerification)
+        .filter(models.CepikVerification.search_id == s.id)
+        .order_by(models.CepikVerification.created_at.desc())
+        .first()
+    )
+    latest_verification = None
+    if latest:
+        latest_verification = {
+            "id": latest.id,
+            "normalized": latest.normalized_json,
+            "comparison": latest.comparison_json,
+            "cache_hit": latest.cache_hit,
+            "created_at": latest.created_at.isoformat() if latest.created_at else None,
+        }
+    return schemas.SearchDetailOut(
+        id=s.id,
+        user_id=s.user_id,
+        listing_url=s.listing_url,
+        snapshot_json=s.snapshot_json,
+        manual_vin=s.manual_vin,
+        manual_first_registration=s.manual_first_registration,
+        manual_license_plate=s.manual_license_plate,
+        created_at=s.created_at,
+        latest_verification=latest_verification,
+    )
+
+
 @router.patch("/{search_id}", response_model=schemas.SearchOut)
 def patch_search(
     search_id: int,
@@ -163,44 +203,6 @@ def get_search(
     s = db.query(models.Search).filter(models.Search.id == search_id, models.Search.user_id == user.id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Search not found")
-    latest = (
-        db.query(models.CepikVerification)
-        .filter(models.CepikVerification.search_id == s.id)
-        .order_by(models.CepikVerification.created_at.desc())
-        .first()
-    )
-    latest_verification = None
-    if latest:
-        latest_verification = {
-            "id": latest.id,
-            "normalized": latest.normalized_json,
-            "comparison": latest.comparison_json,
-            "cache_hit": latest.cache_hit,
-            "created_at": latest.created_at.isoformat() if latest.created_at else None,
-        }
-    return schemas.SearchDetailOut(
-        id=s.id,
-        user_id=s.user_id,
-        listing_url=s.listing_url,
-        snapshot_json=s.snapshot_json,
-        manual_vin=s.manual_vin,
-        manual_first_registration=s.manual_first_registration,
-        manual_license_plate=s.manual_license_plate,
-        created_at=s.created_at,
-        latest_verification=latest_verification,
-    )
-
-
-@router.get("/lookup/by-url", response_model=schemas.SearchDetailOut | None)
-def get_search_by_url(
-    listing_url: str,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user),
-):
-    norm = _norm_url(listing_url)
-    s = db.query(models.Search).filter(models.Search.user_id == user.id, models.Search.listing_url == norm).first()
-    if not s:
-        return None
     latest = (
         db.query(models.CepikVerification)
         .filter(models.CepikVerification.search_id == s.id)

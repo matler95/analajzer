@@ -43,22 +43,30 @@ export default function App() {
   const [scanHistOpen,     setScanHistOpen]    = useState(false);
   const [helpOpen,         setHelpOpen]        = useState(false);
   const [mainTab,          setMainTab]         = useState("search");
-  const [dbRefreshKey,     setDbRefreshKey]    = useState(0);
   const [uxNoticeGlobal,   setUxNoticeGlobal]  = useState(null);
   const [openedFromSource, setOpenedFromSource]= useState(null);
   const [sessionExpired,   setSessionExpired]  = useState(false);
   const urlInputRef = useRef(null);
 
-  // ─── Auth ─────────────────────────────────────────────────
+  // FIX #6: Replace key={dbRefreshKey} with an imperative refresh handle.
+  // This triggers a data reload in VehicleDatabaseTab without remounting it,
+  // preserving expanded cards, selections, compare state, scroll and sort.
+  const vdbRefreshRef = useRef(null);
+
+  // ─── Auth ─────────────────────────────────────────────
   const {
     me, authEmail, setAuthEmail, authPass, setAuthPass, authErr,
     login, register, logout, refreshMe,
   } = useAuth();
 
-  // ─── Session guard ────────────────────────────────────────
-  useSessionGuard({ onExpired: useCallback(() => setSessionExpired(true), []) });
+  // ─── Session guard ────────────────────────────────────
+  // FIX #2+#3: useSessionGuard now uses refs internally; we only need the
+  // resetGuard helper to clear the fired flag after a successful re-login.
+  const { resetGuard } = useSessionGuard({
+    onExpired: useCallback(() => setSessionExpired(true), []),
+  });
 
-  // ─── Search ───────────────────────────────────────────────
+  // ─── Search ───────────────────────────────────────────
   const {
     url, setUrl, loading, data, setData, error,
     portal, savedSearchId, setSavedSearchId,
@@ -66,13 +74,13 @@ export default function App() {
     cepik, setCepik, vinLoading, run, updateField,
   } = useSearch({ me });
 
-  // ─── CEPiK ────────────────────────────────────────────────
+  // ─── CEPiK ────────────────────────────────────────────
   const { cepikLoading, cepikErr, setCepikErr, verifyGov } = useCepik({
     me, data, savedSearchId,
     onVerified: (result) => { setCepik(result); setSaveMsg(null); },
   });
 
-  // ─── History ──────────────────────────────────────────────
+  // ─── History ──────────────────────────────────────────
   const {
     history, histLoading, histVerifyBusy, uxNotice, setUxNotice,
     loadHistory, deleteHistoryItem, patchHistoryItem, verifyHistoryItem, openHistoryItem,
@@ -80,17 +88,19 @@ export default function App() {
 
   useEffect(() => { if (historyOpen && me) loadHistory(); }, [historyOpen, me, loadHistory]);
 
-  // ─── Filters ──────────────────────────────────────────────
+  // ─── Filters ──────────────────────────────────────────
   const { filters, addFilter, removeFilter, updateFilter, markFilterRun } = useFilters();
 
-  // ─── Scan history ─────────────────────────────────────────
+  // ─── Scan history ─────────────────────────────────────
   const { scanHistory, addScanRun, clearScanHistory } = useScanHistory();
 
-  // ─── Background Job ───────────────────────────────────────
+  // ─── Background Job ───────────────────────────────────
   const { job, isRunning, startJob, cancelJob } = useBackgroundJob({
     me,
     onJobComplete: useCallback((stats) => {
-      setDbRefreshKey(k => k + 1);
+      // FIX #6: Soft-refresh the DB tab without remounting it.
+      vdbRefreshRef.current?.();
+
       if (stats.filterId) markFilterRun(stats.filterId, stats);
       const filterName = filters.find(f => f.id === stats.filterId)?.name ?? "Skan";
       addScanRun({ ...stats, filterName });
@@ -105,7 +115,7 @@ export default function App() {
     }, [markFilterRun, addScanRun, filters]),
   });
 
-  // ─── Keyboard shortcuts ───────────────────────────────────
+  // ─── Keyboard shortcuts ───────────────────────────────
   useKeyboardShortcuts({
     onFocusUrl:      useCallback(() => { setMainTab("search"); urlInputRef.current?.focus(); }, []),
     onSave:          useCallback(() => { if (data && me) saveManualToDb({}); }, [data, me]),
@@ -115,10 +125,10 @@ export default function App() {
     onToggleHistory: useCallback(() => setHistoryOpen(v => !v), []),
   });
 
-  // ─── Run ──────────────────────────────────────────────────
+  // ─── Run ──────────────────────────────────────────────
   const handleRun = useCallback(() => { setOpenedFromSource(null); run(); }, [run]);
 
-  // ─── Save ─────────────────────────────────────────────────
+  // ─── Save ─────────────────────────────────────────────
   const saveManualToDb = useCallback(async ({ cepikResult } = {}) => {
     if (!data || !me) return;
     const normUrl = data.listingUrl;
@@ -161,11 +171,12 @@ export default function App() {
       const j = await res.json();
       setSavedSearchId(j.id);
       setSaveMsg("Zapisano w bazie pojazdów.");
-      setDbRefreshKey(k => k + 1);
+      // FIX #6: Soft refresh instead of key bump.
+      vdbRefreshRef.current?.();
     }
   }, [data, me, setSaveMsg, setSavedSearchId]);
 
-  // ─── Open helpers ─────────────────────────────────────────
+  // ─── Open helpers ─────────────────────────────────────
   const applyOpenedRecord = useCallback((row, source) => {
     setData(mergeSearchRecord(row));
     setSavedSearchId(row.id);
@@ -203,7 +214,7 @@ export default function App() {
       setSavedSearchId(null); setData(null); setCepik(null); setOpenedFromSource(null);
     }
     await loadHistory();
-    setDbRefreshKey(k => k + 1);
+    vdbRefreshRef.current?.();
   }, [deleteHistoryItem, savedSearchId, setSavedSearchId, setData, setCepik, loadHistory]);
 
   const handleRunFilter    = useCallback((f) => { if (!isRunning) startJob(f); }, [isRunning, startJob]);
@@ -266,7 +277,11 @@ export default function App() {
           authEmail={authEmail} setAuthEmail={setAuthEmail}
           authPass={authPass}   setAuthPass={setAuthPass}
           authErr={authErr} login={login}
-          onLogin={async () => { setSessionExpired(false); await refreshMe(); }}
+          onLogin={async () => {
+            setSessionExpired(false);
+            resetGuard(); // FIX #2: allow the guard to fire again after re-login
+            await refreshMe();
+          }}
           onDismiss={() => setSessionExpired(false)}
         />
       )}
@@ -330,7 +345,16 @@ export default function App() {
         )}
 
         {mainTab === "database" && (
-          <VehicleDatabaseTab key={dbRefreshKey} me={me} onOpenItem={handleOpenDbItem} filters={filters} />
+          // FIX #6: No more key={dbRefreshKey} — use refreshRef instead.
+          // FIX #4: Pass isRunning so per-group scan button disables correctly.
+          <VehicleDatabaseTab
+            me={me}
+            onOpenItem={handleOpenDbItem}
+            filters={filters}
+            onRunFilter={handleRunFilter}
+            isJobRunning={isRunning}
+            refreshRef={vdbRefreshRef}
+          />
         )}
       </div>
 

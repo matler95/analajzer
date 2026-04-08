@@ -49,17 +49,34 @@ function checkTooltip(check) {
 /* ─── LIGHTBOX ─────────────────────────────────────────── */
 function Lightbox({ images, initialIndex, onClose }) {
   const [idx, setIdx] = useState(initialIndex);
+  const overlayRef = useRef(null);
+
   const prev = () => setIdx(i => (i - 1 + images.length) % images.length);
   const next = () => setIdx(i => (i + 1) % images.length);
 
+  // FIX #8: Focus the overlay on mount so onKeyDown fires without a click.
+  useEffect(() => {
+    overlayRef.current?.focus();
+  }, []);
+
   const handleKey = (e) => {
-    if (e.key === "ArrowLeft") prev();
-    if (e.key === "ArrowRight") next();
-    if (e.key === "Escape") onClose();
+    if (e.key === "ArrowLeft")  { e.preventDefault(); prev(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); next(); }
+    if (e.key === "Escape")     onClose();
   };
 
   return (
-    <div className="lightbox-overlay" onClick={onClose} onKeyDown={handleKey} tabIndex={0} role="dialog" aria-label="Przeglądarka zdjęć">
+    <div
+      ref={overlayRef}
+      className="lightbox-overlay"
+      onClick={onClose}
+      onKeyDown={handleKey}
+      tabIndex={0}
+      role="dialog"
+      aria-label="Przeglądarka zdjęć"
+      // autoFocus via useEffect above — the ref approach works more reliably
+      // with React StrictMode than the autoFocus prop.
+    >
       <div className="lightbox-inner" onClick={e => e.stopPropagation()}>
         <button type="button" className="lightbox-close" onClick={onClose} aria-label="Zamknij">✕</button>
         <img src={images[idx]} alt={`Zdjęcie ${idx + 1}`} className="lightbox-img" />
@@ -74,6 +91,7 @@ function Lightbox({ images, initialIndex, onClose }) {
     </div>
   );
 }
+
 
 /* ─── HERO IMAGE ────────────────────────────────────────── */
 // FIX: lightboxOpen is now an index (number) or null, not boolean.

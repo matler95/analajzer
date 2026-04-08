@@ -23,41 +23,45 @@ export function clearTokens() {
 async function refreshAccess() {
   const { refresh } = getTokens();
   if (!refresh) return null;
-  let res;
   try {
-    res = await fetch(`${API_BASE}/auth/refresh`, {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refresh }),
     });
-  } catch (e) {
-    throw e;
-  }
-  if (!res.ok) {
-    clearTokens();
+    if (!res.ok) {
+      clearTokens();
+      return null;
+    }
+    const j = await res.json();
+    setTokens(j.access_token, j.refresh_token);
+    return j.access_token;
+  } catch {
     return null;
   }
-  const j = await res.json();
-  setTokens(j.access_token, j.refresh_token);
-  return j.access_token;
 }
 
 export async function apiFetch(path, opts = {}) {
+  // FIX #15: Spread into a new object so the caller's opts are never mutated.
+  const reqOpts = { ...opts };
+
   const { access } = getTokens();
-  const headers = { ...(opts.headers || {}) };
-  if (opts.body && typeof opts.body === "object" && !(opts.body instanceof FormData)) {
+  const headers = { ...(reqOpts.headers || {}) };
+
+  if (reqOpts.body && typeof reqOpts.body === "object" && !(reqOpts.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
-    opts.body = JSON.stringify(opts.body);
+    reqOpts.body = JSON.stringify(reqOpts.body);
   }
+
   if (access) headers.Authorization = `Bearer ${access}`;
 
-  let res;
-  res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+  let res = await fetch(`${API_BASE}${path}`, { ...reqOpts, headers });
+
   if (res.status === 401 && getTokens().refresh) {
     const newA = await refreshAccess();
     if (newA) {
       headers.Authorization = `Bearer ${newA}`;
-      res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+      res = await fetch(`${API_BASE}${path}`, { ...reqOpts, headers });
     }
   }
   return res;

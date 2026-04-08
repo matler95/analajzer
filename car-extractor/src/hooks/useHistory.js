@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { apiFetch } from "../api.js";
 import {
   mergeSearchRecord,
@@ -11,19 +11,33 @@ import {
   formatFastApiDetail,
 } from "../utils/normalize.js";
 
+const HISTORY_FRESH_MS = 30_000; // FIX #13: don't re-fetch if data is < 30s old
+
 export function useHistory({ me }) {
   const [history, setHistory] = useState([]);
   const [histLoading, setHistLoading] = useState(false);
   const [histVerifyBusy, setHistVerifyBusy] = useState({});
   const [uxNotice, setUxNotice] = useState(null);
 
-  const loadHistory = useCallback(async () => {
+  // FIX #13: Track last successful fetch time to debounce rapid re-opens.
+  const lastFetchedAt = useRef(0);
+
+  const loadHistory = useCallback(async (force = false) => {
     if (!me) return;
+    const now = Date.now();
+    // FIX #13: Skip refetch if data is fresh (historyOpen toggle fires this
+    // every time the drawer opens; without the guard it refetches on every open).
+    if (!force && now - lastFetchedAt.current < HISTORY_FRESH_MS) return;
+
     setHistLoading(true);
     try {
       const res = await apiFetch("/searches");
-      if (res.ok) setHistory(await res.json());
-      else setHistory([]);
+      if (res.ok) {
+        setHistory(await res.json());
+        lastFetchedAt.current = Date.now();
+      } else {
+        setHistory([]);
+      }
     } finally {
       setHistLoading(false);
     }
@@ -39,6 +53,8 @@ export function useHistory({ me }) {
       return;
     }
     setHistory(prev => prev.filter(h => h.id !== id));
+    // Invalidate cache so next open fetches fresh data.
+    lastFetchedAt.current = 0;
     return id;
   }, []);
 
@@ -48,7 +64,8 @@ export function useHistory({ me }) {
       const j = await res.json().catch(() => ({}));
       return { error: formatFastApiDetail(j.detail) || "Nie udało się zapisać." };
     }
-    await loadHistory();
+    // Force-refresh after a patch so the drawer shows updated values.
+    await loadHistory(true);
     return { ok: true };
   }, [loadHistory]);
 
@@ -89,7 +106,7 @@ export function useHistory({ me }) {
         setUxNotice({ kind: "error", msg: formatFastApiDetail(j.detail) || "Weryfikacja nie powiodła się." });
         return;
       }
-      await loadHistory();
+      await loadHistory(true);
     } finally {
       setHistVerifyBusy(b => ({ ...b, [row.id]: false }));
     }
