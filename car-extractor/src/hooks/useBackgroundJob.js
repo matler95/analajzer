@@ -10,14 +10,12 @@ import {
   isValidVin,
   stripDebug,
 } from "../utils/normalize.js";
-
-const DELAY_MS      = 2500;
-const MAX_PAGES_AUTO = 12;
-// Maximum number of historical price entries kept per vehicle.
-const MAX_PRICE_HISTORY = 20;
-// After this many milliseconds with no further price change, clear __priceDiff
-// so stale "▼ 5 000 PLN" badges don't persist across unrelated future scans.
-const PRICE_CHANGE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+import {
+  PRICE_CHANGE_TTL_MS,
+  MAX_PRICE_HISTORY,
+  SCAN_DELAY_MS,
+  MAX_PAGES_AUTO,
+} from "../utils/constants.js"; // FIX #9: single source of truth
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -129,30 +127,47 @@ export function useBackgroundJob({ me, onJobComplete }) {
       }
 
       // ── Phase B: archive detection ───────────────────────────
+      // FIX #5: Use __filterNames (multi-filter tracking) not just __filterId.
+      // Only archive a vehicle when no other filter still claims it.
       try {
         const allRes = await apiFetch("/searches");
         if (allRes.ok) {
           const allSaved = await allRes.json();
-          const filterSaved = allSaved.filter(r =>
-            r.snapshot_json?.__filterId === filter.id &&
-            r.snapshot_json?.__source   === "auto"
-          );
+          const filterSaved = allSaved.filter(r => {
+            const snap = r.snapshot_json || {};
+            if (snap.__source !== "auto") return false;
+            // New multi-filter format
+            if (Array.isArray(snap.__filterNames) && snap.__filterNames.includes(filter.name)) return true;
+            // Legacy single-filter format (backward compat)
+            if (snap.__filterId === filter.id) return true;
+            return false;
+          });
+
           for (const saved of filterSaved) {
             const normUrl = normListingUrl(saved.listing_url);
             if (!foundUrls.has(normUrl)) {
+              const snap = saved.snapshot_json || {};
+              // Remove this filter from __filterNames; only archive when empty.
+              const remaining = (snap.__filterNames || [snap.__filterName].filter(Boolean))
+                .filter(name => name !== filter.name);
+
               await apiFetch(`/searches/${saved.id}`, {
                 method: "PATCH",
                 body: {
                   snapshot_json: {
-                    ...saved.snapshot_json,
-                    __archived:   true,
-                    __archivedAt: new Date().toISOString(),
-                    __isNew:      false,
+                    ...snap,
+                    __filterNames:  remaining,
+                    __archived:     remaining.length === 0,
+                    __archivedAt:   remaining.length === 0 ? new Date().toISOString() : snap.__archivedAt,
+                    __isNew:        false,
                   },
                 },
               });
-              archivedCount++;
-              setJob(prev => ({ ...prev, archivedCount }));
+
+              if (remaining.length === 0) {
+                archivedCount++;
+                setJob(prev => ({ ...prev, archivedCount }));
+              }
             }
           }
         }
@@ -176,7 +191,6 @@ export function useBackgroundJob({ me, onJobComplete }) {
         }));
 
         try {
-          // ── Check if the URL is already in the database ──────
           const existingRes = await apiFetch(
             `/searches/lookup/by-url?listing_url=${encodeURIComponent(normUrl)}`
           );
@@ -186,28 +200,26 @@ export function useBackgroundJob({ me, onJobComplete }) {
           if (existingRow?.id) {
             const existSnap = existingRow.snapshot_json || {};
 
-            // ─────────────────────────────────────────────────────
-            // Filter overlap handling:
-            //   Same filter  → price-change detection + __lastSeenAt refresh
-            //   Other filter → add to __filterNames list, refresh __lastSeenAt
-            // ─────────────────────────────────────────────────────
-            const sameFilter = existSnap.__filterId === filter.id;
+            // FIX #5: sameFilter uses __filterNames, not __filterId.
+            const existingFilterNames = new Set(
+              existSnap.__filterNames || [existSnap.__filterName].filter(Boolean)
+            );
+            const sameFilter = existingFilterNames.has(filter.name);
 
             if (!sameFilter) {
-              // Track all filters that have found this vehicle
-              const existingFilterNames = new Set(existSnap.__filterNames || [existSnap.__filterName].filter(Boolean));
+              // Add this filter to the vehicle's filter tracking.
               existingFilterNames.add(filter.name);
-              
+
               try {
                 await apiFetch(`/searches/${existingRow.id}`, {
                   method: "PATCH",
                   body: {
                     snapshot_json: {
                       ...existSnap,
-                      __filterNames:  [...existingFilterNames],  // Track all filters
-                      __lastSeenAt:   new Date().toISOString(),
-                      __archived:     false,
-                      __isNew:        false,
+                      __filterNames: [...existingFilterNames],
+                      __lastSeenAt:  new Date().toISOString(),
+                      __archived:    false,
+                      __isNew:       false,
                     },
                   },
                 });
@@ -225,21 +237,15 @@ export function useBackgroundJob({ me, onJobComplete }) {
               const car = parseMd(md, normUrl);
 
               if (car.price && oldPrice && Math.abs(car.price - oldPrice) > 100) {
-                // ── Price changed ─────────────────────────────────
                 priceChanges++;
-                const priceDiff = car.price - oldPrice; // negative = drop, positive = rise
+                const priceDiff = car.price - oldPrice;
 
-                // Accumulate history, capped at MAX_PRICE_HISTORY entries so the
-                // snapshot_json column doesn't grow without bound.
                 const prevHistory = Array.isArray(existSnap.__priceHistory)
                   ? existSnap.__priceHistory
                   : [];
                 const cappedHistory = [
                   ...prevHistory,
-                  {
-                    price:      oldPrice,
-                    recordedAt: existSnap.__lastSeenAt || existingRow.created_at,
-                  },
+                  { price: oldPrice, recordedAt: existSnap.__lastSeenAt || existingRow.created_at },
                 ].slice(-MAX_PRICE_HISTORY);
 
                 await apiFetch(`/searches/${existingRow.id}`, {
@@ -247,26 +253,18 @@ export function useBackgroundJob({ me, onJobComplete }) {
                   body: {
                     snapshot_json: {
                       ...existSnap,
-                      price: car.price,
-                      __priceHistory: cappedHistory,
-                      // Relative to the immediately previous price so the badge
-                      // always reflects the latest single move, not all-time delta.
-                      __priceDiff: priceDiff,
-                      // Timestamp used by the UI to know this change is "fresh"
-                      // and to auto-expire the badge after PRICE_CHANGE_TTL_MS.
+                      price:           car.price,
+                      __priceHistory:  cappedHistory,
+                      __priceDiff:     priceDiff,
                       __priceChangedAt: new Date().toISOString(),
-                      __lastSeenAt: new Date().toISOString(),
-                      __archived:   false,
-                      __isNew:      false,
+                      __lastSeenAt:    new Date().toISOString(),
+                      __archived:      false,
+                      __isNew:         false,
                     },
                   },
                 });
                 setJob(prev => ({ ...prev, priceChanges }));
               } else {
-                // ── No price change this run ───────────────────────
-                // Clear __priceDiff / __priceChangedAt once the TTL expires so
-                // stale "▼ X PLN" badges don't persist indefinitely across future
-                // scans that return the same price.
                 const changedAt = existSnap.__priceChangedAt;
                 const isExpired =
                   changedAt &&
@@ -277,9 +275,7 @@ export function useBackgroundJob({ me, onJobComplete }) {
                   body: {
                     snapshot_json: {
                       ...existSnap,
-                      ...(isExpired
-                        ? { __priceDiff: null, __priceChangedAt: null }
-                        : {}),
+                      ...(isExpired ? { __priceDiff: null, __priceChangedAt: null } : {}),
                       __lastSeenAt: new Date().toISOString(),
                       __archived:   false,
                       __isNew:      false,
@@ -295,27 +291,26 @@ export function useBackgroundJob({ me, onJobComplete }) {
             continue;
           }
 
-          // ── New listing — fetch full data ──────────────────
+          // ── New listing ──────────────────────────────────────
           const md  = await fetchPage(normUrl);
           const car = parseMd(md, normUrl);
           car.listingUrl = normUrl;
 
           const snapshot = {
             ...stripDebug(car),
-            __source:      "auto",
-            __filterId:    filter.id,
-            __filterName:  filter.name,
-            __filterNames: [filter.name],  // Track all filters this vehicle appears in
-            __isNew:       true,
-            __firstSeenAt: new Date().toISOString(),
-            __lastSeenAt:  new Date().toISOString(),
-            __archived:    false,
-            __priceHistory:    [],
-            __priceDiff:       null,
-            __priceChangedAt:  null,
+            __source:        "auto",
+            __filterId:      filter.id,
+            __filterName:    filter.name,
+            __filterNames:   [filter.name],
+            __isNew:         true,
+            __firstSeenAt:   new Date().toISOString(),
+            __lastSeenAt:    new Date().toISOString(),
+            __archived:      false,
+            __priceHistory:  [],
+            __priceDiff:     null,
+            __priceChangedAt: null,
           };
 
-          // Try VIN via scraper for Otomoto (Playwright) if missing
           if (!car.vin && /otomoto\.pl/i.test(normUrl)) {
             try {
               const vinRes = await apiFetch(`/scraper/vin?listing_url=${encodeURIComponent(normUrl)}`);
@@ -328,7 +323,6 @@ export function useBackgroundJob({ me, onJobComplete }) {
 
           if (cancelRef.current) break;
 
-          // ── Upgrade manual entry if it exists ───────────────
           let searchId = null;
           try {
             const manualRes = await apiFetch(
@@ -342,17 +336,17 @@ export function useBackgroundJob({ me, onJobComplete }) {
                   body: {
                     snapshot_json: {
                       ...manualRow.snapshot_json,
-                      __source:          "auto",
-                      __filterId:        filter.id,
-                      __filterName:      filter.name,
-                      __filterNames:     [filter.name],
-                      __isNew:           true,
-                      __firstSeenAt:     new Date().toISOString(),
-                      __lastSeenAt:      new Date().toISOString(),
-                      __archived:        false,
-                      __priceHistory:    [],
-                      __priceDiff:       null,
-                      __priceChangedAt:  null,
+                      __source:        "auto",
+                      __filterId:      filter.id,
+                      __filterName:    filter.name,
+                      __filterNames:   [filter.name],
+                      __isNew:         true,
+                      __firstSeenAt:   new Date().toISOString(),
+                      __lastSeenAt:    new Date().toISOString(),
+                      __archived:      false,
+                      __priceHistory:  [],
+                      __priceDiff:     null,
+                      __priceChangedAt: null,
                     },
                   },
                 });
@@ -364,7 +358,6 @@ export function useBackgroundJob({ me, onJobComplete }) {
             }
           } catch { /* silent */ }
 
-          // ── Save new listing ──────────────────────────────
           if (!searchId) {
             const saveRes = await apiFetch("/searches", {
               method: "POST",
@@ -386,7 +379,6 @@ export function useBackgroundJob({ me, onJobComplete }) {
 
           if (cancelRef.current) break;
 
-          // ── CEPiK verification ────────────────────────────
           const plate = normalizeLicensePlate(car.licensePlate || "");
           const vin   = normalizeVin(car.vin || "");
           const fr    = normalizeDateForCepik(car.firstRegistration || "");
@@ -396,12 +388,12 @@ export function useBackgroundJob({ me, onJobComplete }) {
               const cepikRes = await apiFetch("/cepik/verify", {
                 method: "POST",
                 body: {
-                  search_id:            searchId,
-                  registration_number:  plate,
-                  vin_number:           vin,
+                  search_id:               searchId,
+                  registration_number:     plate,
+                  vin_number:              vin,
                   first_registration_date: fr,
-                  listing_snapshot:     snapshot,
-                  force_refresh:        false,
+                  listing_snapshot:        snapshot,
+                  force_refresh:           false,
                 },
               });
               if (cepikRes.ok) {
@@ -420,7 +412,7 @@ export function useBackgroundJob({ me, onJobComplete }) {
           }));
         }
 
-        await sleep(DELAY_MS + Math.random() * 1500);
+        await sleep(SCAN_DELAY_MS + Math.random() * 1500);
       }
 
     } catch (err) {

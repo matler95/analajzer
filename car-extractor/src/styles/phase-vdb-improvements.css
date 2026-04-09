@@ -903,3 +903,24 @@
 
 .vdbc-chain-arrow--drop { color: #7fffbe; }
 .vdbc-chain-arrow--rise { color: #ffb0b0; }
+
+/* ═══════════════════════════════════════════════════════════
+   FIX #11 — VDB refreshing banner
+   Append to phase-vdb-improvements.css
+   ═══════════════════════════════════════════════════════════ */
+
+.vdb-refreshing-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--amber);
+  border-radius: 4px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 0.5px;
+  animation: fadeUp 0.2s ease;
+}

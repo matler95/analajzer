@@ -125,8 +125,16 @@ export default function App() {
     onToggleHistory: useCallback(() => setHistoryOpen(v => !v), []),
   });
 
+  // FIX #14: Track whether a search has been initiated to avoid the brief flash
+  // where neither skeleton nor empty state renders (loading starts async).
+  const hasSearchedRef = useRef(false);
+
   // ─── Run ──────────────────────────────────────────────
-  const handleRun = useCallback(() => { setOpenedFromSource(null); run(); }, [run]);
+  const handleRun = useCallback(() => {
+    hasSearchedRef.current = true;
+    setOpenedFromSource(null);
+    run();
+  }, [run]);
 
   // ─── Save ─────────────────────────────────────────────
   const saveManualToDb = useCallback(async ({ cepikResult } = {}) => {
@@ -324,7 +332,7 @@ export default function App() {
                 <div><strong>Błąd</strong> — {error}</div>
               </div>
             )}
-            {!loading && !data && !error && <SearchEmptyState />}
+            {!loading && !data && !error && !hasSearchedRef.current && <SearchEmptyState />}
             {data && (
               <ResultCard
                 data={data} cepik={cepik}

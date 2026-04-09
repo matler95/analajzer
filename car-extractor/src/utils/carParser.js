@@ -2,17 +2,21 @@
  * Car listing parser — fetches via Jina AI and extracts structured data
  * from markdown output.
  *
- * CHANGELOG (bug fixes):
- *  - enginePower:        Added "Moc silnika" (OLX label) and "Moc" partial match
- *  - engineDisplacement: Added "Poj. silnika", "Pojemność silnika" (OLX labels)
- *  - fuelType:           Added "Paliwo" (OLX label)
- *  - extractMileage:     Replaced Math.max with priority-ordered selection.
- *                        KV/structured data wins; findNumUnit fallback is only
- *                        used when nothing else works, and values < 500 km are
- *                        rejected (filter out power figures like "192km" in titles).
- *  - price extraction:   Now searches entire document for heading patterns.
- *                        Handles OLX price placement after model heading.
- *                        Picks last valid match in 1000-10M PLN range.
+ * FIXES:
+ *  FIX #20 — fetchPage: first two header strategies now run in parallel
+ *             (Promise.allSettled). The best-scoring result wins. Only falls
+ *             back to sequential attempts 3 & 4 if neither parallel attempt
+ *             returns a high-quality result (score ≥ 8).
+ *
+ *  FIX #12 — Price extraction: heading-level prices (## / ### / ####) are
+ *             scored higher than body-text prices. The old Priority-4 fallback
+ *             used Math.max which caused "Wartość pojazdu: 180 000 zł" to beat
+ *             the actual "45 000 zł" listing price. New logic:
+ *               Priority 1 — KV/field structured data  (Otomoto)
+ *               Priority 2 — Last heading with a valid price (OLX + Otomoto)
+ *               Priority 3 — First body-text currency match in valid range
+ *             "Last heading" wins over body-text because OLX places the price
+ *             heading after the model heading, making it the last heading-match.
  */
 
 import { normalizeVin, isValidVin } from "./normalize.js";
@@ -25,22 +29,26 @@ export function detectPortal(url) {
   return "unknown";
 }
 
+function scoreMarkdown(txt) {
+  const t = String(txt ?? "");
+  const low = t.toLowerCase();
+  let s = 0;
+  if (t.length > 2000) s += 2;
+  if (/##\s+najważniejsze/i.test(t)) s += 3;
+  if (/##\s+szczegóły/i.test(t)) s += 3;
+  if (/informacje o sprzedającym/i.test(low)) s += 2;
+  if (/nap[ęe]d/i.test(low)) s += 2;
+  if (/rejestracyj/i.test(low)) s += 2;
+  if (/znajd[źz] na mapie|krak[óo]w/i.test(low)) s += 2;
+  if (/request blocked|cloudfront|403 error/i.test(low)) s -= 10;
+  return s;
+}
+
+// FIX #20: Run the two most-promising strategies in parallel, then fall back
+// to sequential attempts only if neither parallel hit is good enough.
 export async function fetchPage(url) {
   const endpoint = `https://r.jina.ai/${url}`;
-  const score = (txt) => {
-    const t = String(txt ?? "");
-    const low = t.toLowerCase();
-    let s = 0;
-    if (t.length > 2000) s += 2;
-    if (/##\s+najważniejsze/i.test(t)) s += 3;
-    if (/##\s+szczegóły/i.test(t)) s += 3;
-    if (/informacje o sprzedającym/i.test(low)) s += 2;
-    if (/nap[ęe]d/i.test(low)) s += 2;
-    if (/rejestracyj/i.test(low)) s += 2;
-    if (/znajd[źz] na mapie|krak[óo]w/i.test(low)) s += 2;
-    if (/request blocked|cloudfront|403 error/i.test(low)) s -= 10;
-    return s;
-  };
+
   const attempts = [
     { Accept: "text/plain", "x-respond-with": "markdown" },
     { Accept: "text/plain", "x-target-selector": "main,article,body", "x-respond-with": "markdown" },
@@ -48,29 +56,48 @@ export async function fetchPage(url) {
     { Accept: "text/plain" },
   ];
 
-  let lastErr = null;
   let best = "";
   let bestScore = -Infinity;
-  for (const headers of attempts) {
-    try {
-      const res = await fetch(endpoint, {
-        headers,
-        signal: AbortSignal.timeout(25000),
-      });
-      if (!res.ok) throw new Error(`Jina HTTP ${res.status}`);
-      const text = await res.text();
-      const s = score(text);
+
+  const tryFetch = async (headers) => {
+    const res = await fetch(endpoint, { headers, signal: AbortSignal.timeout(25000) });
+    if (!res.ok) throw new Error(`Jina HTTP ${res.status}`);
+    return res.text();
+  };
+
+  // FIX #20: Parallel first two attempts
+  const parallelResults = await Promise.allSettled([
+    tryFetch(attempts[0]),
+    tryFetch(attempts[1]),
+  ]);
+
+  for (const r of parallelResults) {
+    if (r.status === "fulfilled") {
+      const text = r.value;
+      const s = scoreMarkdown(text);
       if (s > bestScore || (s === bestScore && text.length > best.length)) {
         best = text;
         bestScore = s;
       }
       if (s >= 8 && text.length > 1200) return text;
-    } catch (e) {
-      lastErr = e;
     }
   }
+
+  // Fall back to sequential attempts 3 & 4 if parallel results were poor
+  for (const headers of attempts.slice(2)) {
+    try {
+      const text = await tryFetch(headers);
+      const s = scoreMarkdown(text);
+      if (s > bestScore || (s === bestScore && text.length > best.length)) {
+        best = text;
+        bestScore = s;
+      }
+      if (s >= 8 && text.length > 1200) return text;
+    } catch { /* silent */ }
+  }
+
   if (best.length > 100) return best;
-  throw new Error(`Pusta odpowiedź z Jina AI${lastErr ? `: ${lastErr.message}` : ""}`);
+  throw new Error("Pusta odpowiedź z Jina AI");
 }
 
 /* ─── PARSER HELPERS ─────────────────────────────────────── */
@@ -194,36 +221,26 @@ function findNumUnit(md, unitRe) {
 }
 
 function extractMileage(md, kv) {
-  // Priority 1 — KV map (structured, most reliable)
   const kvMileage = fromKv(kv, "Przebieg", "Przebieg (km)", "Mileage");
   if (kvMileage) {
     const n = toNum(kvMileage);
     if (Number.isFinite(n) && n > 0) return n;
   }
-
-  // Priority 2 — field() pattern matching
   const fieldMileage = field(md, "Przebieg", "Przebieg (km)", "Mileage");
   if (fieldMileage) {
     const n = toNum(fieldMileage);
     if (Number.isFinite(n) && n > 0) return n;
   }
-
-  // Priority 3 — near-label regex (label case-insensitive, unit lowercase only)
   const nearLabel = md.match(/Przebieg[\s:|\-*]*\n?\s*([0-9][\d\s.,\u00a0]*(?:\s*tys\.?)?)\s*km\b/i);
   if (nearLabel?.[1]) {
     const n = toNum(nearLabel[1]);
     if (Number.isFinite(n) && n > 0) return n;
   }
-
-  // Priority 4 — last-resort scan. Lowercase-only "km" avoids matching "192KM"
-  // (horsepower) which appears as "192km" in OLX URL slugs. Threshold > 1000
-  // rules out HP values (50–700 range) misread from the slug.
   const fallback = md.match(/\b([0-9][\d\s.,\u00a0]{0,15})\s*km(?![A-Z/])/);
   if (fallback) {
     const n = toNum(fallback[1]);
     if (Number.isFinite(n) && n > 1000) return n;
   }
-
   return null;
 }
 
@@ -382,6 +399,62 @@ function extractGeneration(md, kv) {
   return null;
 }
 
+/**
+ * FIX #12 — Extract price using a priority hierarchy that prefers
+ * heading-level prices over body-text prices.
+ *
+ * Priority 1: KV/field structured data (Otomoto "Cena" field)
+ * Priority 2: LAST heading (##/###/####) that contains a valid price (1k–10M)
+ *             "Last" wins because OLX places the price heading after the model
+ *             heading, so it appears later in the document than the title.
+ * Priority 3: FIRST body-text "N zł/PLN" match in valid range.
+ *             Uses first, not max — avoids "Wartość pojazdu: 180 000 zł"
+ *             in fine print beating the actual "45 000 zł" listing price.
+ *
+ * Why "first" beats "max" for body-text fallback:
+ *   Listing price typically appears near the top of the description block,
+ *   while footnote figures (loan examples, vehicle value, total cost of
+ *   ownership) appear later. Taking the first valid match in a reasonable
+ *   range (5 000–2 000 000 PLN) gets the right price in the vast majority
+ *   of cases. Financing examples ("od 999 zł/msc") are too small to pass
+ *   the 5 000 floor.
+ */
+function extractPrice(md, kv) {
+  const PRICE_MIN = 1_000;
+  const PRICE_MAX = 10_000_000;
+
+  // Priority 1 — structured KV / field label
+  const priceField = field(md, "Cena", "Price");
+  if (priceField) {
+    const n = toNum(priceField.replace(/\s*(PLN|zł|EUR|USD).*/i, ""));
+    if (n && n >= PRICE_MIN && n <= PRICE_MAX) return n;
+  }
+
+  // Priority 2 — heading-level price (last match wins)
+  // Matches: "## 45 000", "### 45 000 zł", "#### 38 700"
+  const headingRe = /^#{2,4}\s+(\d[\d\s.,\u00a0]*(?:zł|PLN|EUR)?)\s*$/gim;
+  let lastHeadingPrice = null;
+  let m;
+  while ((m = headingRe.exec(md)) !== null) {
+    const n = toNum(m[1].replace(/\s*(zł|PLN|EUR).*/i, ""));
+    if (n && n >= PRICE_MIN && n <= PRICE_MAX) {
+      lastHeadingPrice = n;
+    }
+  }
+  if (lastHeadingPrice !== null) return lastHeadingPrice;
+
+  // Priority 3 — first body-text currency match in a tighter valid range
+  // (floor raised to 5k to filter out financing per-month figures)
+  const BODY_FLOOR = 5_000;
+  const bodyRe = /([0-9][\d\s.,\u00a0]*)\s*(?:zł|PLN)/gi;
+  while ((m = bodyRe.exec(md)) !== null) {
+    const n = toNum(m[1]);
+    if (n && n >= BODY_FLOOR && n <= PRICE_MAX) return n;
+  }
+
+  return null;
+}
+
 /* ─── MAIN PARSER ────────────────────────────────────────── */
 
 export function parseMd(md, url) {
@@ -415,89 +488,28 @@ export function parseMd(md, url) {
 
   const generation = extractGeneration(md, kv);
 
-  // ── price ────────────────────────────────────────────────
-  // Priority 1: Look for KV/field matches (Otomoto structured data)
-  let priceRaw = field(md, "Cena", "Price");
-  
-  // Priority 2: Portal-agnostic heading pattern (entire document)
-  // Works for both OLX ("### 45 000 zł" or "#### 38 700 zł") and Otomoto ("### 26 900")
-  // OLX places price after model heading, so search entire doc and pick last valid match
-  if (!priceRaw) {
-    // Find ALL heading patterns with numbers in the entire document
-    const allMatches = [...md.matchAll(/#{2,4}\s+(\d[\d\s.,\u00a0]*)/g)];
-    
-    if (allMatches.length > 0) {
-      // Filter to valid prices (1000-10M PLN range) and get the LAST one
-      // (typically the main price comes after model/title headers)
-      for (let i = allMatches.length - 1; i >= 0; i--) {
-        const candidate = allMatches[i][1];
-        const candidateNum = toNum(candidate);
-        if (candidateNum && candidateNum >= 1000 && candidateNum < 10000000) {
-          priceRaw = candidate;
-          break;
-        }
-      }
-    }
-  }
-  
-  // Priority 3: Parse the extracted price
-  let price = null;
-  if (priceRaw) {
-    price = toNum(priceRaw.replace(/\s*(PLN|zł|EUR|USD).*/i, ""));
-  } else {
-    // Priority 4: Fallback - scan for numbers with currency, avoiding ads
-    // Look through entire doc but skip very small amounts (ads/financing)
-    const allMatches = [...md.matchAll(/([0-9][\d\s.,\u00a0]*)\s*(?:zł|PLN)/gi)];
-    if (allMatches.length > 0) {
-      let bestPrice = null;
-      let bestNum = 0;
-      for (const m of allMatches) {
-        const candidateNum = toNum(m[1]);
-        if (candidateNum && candidateNum >= 1000 && candidateNum < 10000000) {
-          // Prefer higher prices (actual listing prices > loan examples)
-          if (candidateNum > bestNum) {
-            bestNum = candidateNum;
-            bestPrice = candidateNum;
-          }
-        }
-      }
-      price = bestPrice;
-    }
-  }
-  
+  // FIX #12: Use the new priority-ordered extractPrice helper.
+  const price = extractPrice(md, kv);
   const currency = /\bEUR\b/.test(md.slice(0, 3000)) ? "EUR" : "PLN";
 
   const year =
     fieldNum(md, "Rok produkcji", "Rok", "Year") ??
     (() => { const m = md.match(/Rok\s+produkcji[^0-9]{0,20}([12]\d{3})/i); return m ? +m[1] : null; })();
 
-  // ── enginePower ──────────────────────────────────────────────
-  // OLX uses "Moc silnika" (normalizes to "moc silnika").
-  // Otomoto uses "Moc" (normalizes to "moc").
-  // We try both, plus a text-search for the label, plus findNumUnit fallback.
   const enginePowerRaw =
     fromKv(kv, "Moc silnika", "Moc", "Engine power", "Power") ??
     field(md, "Moc silnika", "Moc", "Engine power", "Power");
 
   let enginePower = null;
   if (enginePowerRaw) {
-    // Strip unit suffix before parsing: "192 KM" → "192"
-    enginePower = toNum(
-      enginePowerRaw.replace(/\s*(KM|HP|kW|pk)\b.*/i, "").trim()
-    );
+    enginePower = toNum(enginePowerRaw.replace(/\s*(KM|HP|kW|pk)\b.*/i, "").trim());
   }
   if (!enginePower) {
-    // Fallback: scan for a number followed by uppercase "KM" (horsepower in Polish).
-    // Case-sensitive — avoids matching lowercase "km" (mileage) that appears in OLX
-    // title slugs like "2.5 192km". Skip the first 300 chars (title / meta area).
     const bodyText = md.slice(300);
     const kmHit = bodyText.match(/([0-9][\d\s.,\u00a0]*)\s*KM\b/);
     if (kmHit) enginePower = toNum(kmHit[1]);
   }
 
-  // ── engineDisplacement ───────────────────────────────────────
-  // OLX uses "Poj. silnika" (normalizes to "poj silnika").
-  // Otomoto uses "Pojemność skokowa" or "Pojemność".
   const engineDisplacementRaw =
     fromKv(kv,
       "Poj. silnika", "Poj silnika", "Pojemność silnika",
@@ -510,16 +522,12 @@ export function parseMd(md, url) {
 
   let engineDisplacement = null;
   if (engineDisplacementRaw) {
-    engineDisplacement = toNum(
-      engineDisplacementRaw.replace(/\s*(cm[³3]|cc|ccm)\b.*/i, "").trim()
-    );
+    engineDisplacement = toNum(engineDisplacementRaw.replace(/\s*(cm[³3]|cc|ccm)\b.*/i, "").trim());
   }
   if (!engineDisplacement) {
     engineDisplacement = findNumUnit(md, "cm[3³]");
   }
 
-  // ── fuelType ─────────────────────────────────────────────────
-  // OLX uses "Paliwo" as the label.
   const fuelType =
     fromKv(kv, "Rodzaj paliwa", "Paliwo", "Fuel type") ??
     field(md, "Rodzaj paliwa", "Paliwo", "Fuel type");

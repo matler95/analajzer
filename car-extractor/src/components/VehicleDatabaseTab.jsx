@@ -4,6 +4,7 @@ import {
   normalizeLicensePlate, normalizeVin, normalizeDateForCepik,
   isValidLicensePlate, isValidVin,
 } from "../utils/normalize.js";
+import { PRICE_CHANGE_TTL_MS } from "../utils/constants.js"; // FIX #9
 import UndoToast, { UNDO_DURATION_MS } from "./UndoToast.jsx";
 import DbStatsPanel from "./DbStatsPanel.jsx";
 import PriceSparkline from "./PriceSparkline.jsx";
@@ -29,14 +30,6 @@ function getCepikStatus(row) {
        && fr    && /^\d{4}-\d{2}-\d{2}$/.test(normalizeDateForCepik(fr))) ? "pending" : "no_data";
 }
 
-/**
- * Returns true when the row has a tracked price change that is still within
- * the 7-day TTL window (matching the TTL enforced by useBackgroundJob).
- * We re-derive the TTL here rather than trusting __priceDiff alone, because
- * the job will have already cleared it server-side; this is a safety net for
- * rows loaded before the next scan runs.
- */
-const PRICE_CHANGE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 function hasPriceChange(row) {
   const s = row.snapshot_json || {};
   if (s.__priceDiff == null || s.__priceDiff === 0) return false;
@@ -58,7 +51,7 @@ function computeGroupStats(rows) {
   const prices   = rows.map(r => r.snapshot_json?.price).filter(v => v > 0);
   const mileages = rows.map(r => r.snapshot_json?.mileage).filter(v => v > 0);
   const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
-  const med = arr => { if (!arr.length) return null; const s = [...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2?s[m]:Math.round((s[m-1]+s[m])/2); };
+  const med = arr => { if (!arr.length) return null; const s = [...arr].sort((a, b)=>a-b); const m=Math.floor(s.length/2); return s.length%2?s[m]:Math.round((s[m-1]+s[m])/2); };
   return { count: rows.length, avgPrice: avg(prices), medPrice: med(prices), minPrice: prices.length?Math.min(...prices):null, maxPrice: prices.length?Math.max(...prices):null, avgMileage: avg(mileages), prices };
 }
 
@@ -83,18 +76,11 @@ function getImgFp(u) {
   catch { return null; }
 }
 
-/* ── PriceChangeBadge ────────────────────────────────────────── */
-/**
- * Small badge shown on the thumbnail/card whenever a price change has been
- * detected within the TTL window.  Drop = green (good), rise = red (bad).
- */
 function PriceChangeBadge({ priceDiff, compact = false }) {
   if (priceDiff == null || priceDiff === 0) return null;
   const isDrop = priceDiff < 0;
   const abs    = Math.abs(priceDiff);
-  const label  = isDrop
-    ? `▼ ${fmt(abs)} PLN`
-    : `▲ ${fmt(abs)} PLN`;
+  const label  = isDrop ? `▼ ${fmt(abs)} PLN` : `▲ ${fmt(abs)} PLN`;
   return (
     <span
       className={`price-change-badge ${isDrop ? "price-change-badge--drop" : "price-change-badge--rise"} ${compact ? "price-change-badge--compact" : ""}`}
@@ -105,14 +91,12 @@ function PriceChangeBadge({ priceDiff, compact = false }) {
   );
 }
 
-/* ── StatusBadge ── */
 function StatusBadge({ status }) {
   const M = { ok:{cls:"vdb-badge--ok",icon:"✓",label:"CEPiK OK"}, issues:{cls:"vdb-badge--issues",icon:"⚠",label:"Uwagi"}, check:{cls:"vdb-badge--check",icon:"?",label:"Sprawdź"}, no_data:{cls:"vdb-badge--nodata",icon:"–",label:"Brak danych"}, pending:{cls:"vdb-badge--pending",icon:"○",label:"Nie zwerif."} };
   const {cls,icon,label} = M[status]||M.no_data;
   return <span className={`vdb-badge ${cls}`}><span className="vdb-badge-icon">{icon}</span>{label}</span>;
 }
 
-/* ── InlineField ── */
 function InlineField({ label, value, fieldKey, onSave }) {
   const [editing,setEditing]=useState(false); const [draft,setDraft]=useState(""); const [err,setErr]=useState(null);
   const norm = useCallback(v=>{ if(!v)return""; if(fieldKey==="vin")return normalizeVin(v); if(fieldKey==="licensePlate")return normalizeLicensePlate(v); if(fieldKey==="firstRegistration")return normalizeDateForCepik(v); return String(v).trim(); },[fieldKey]);
@@ -138,15 +122,20 @@ function InlineField({ label, value, fieldKey, onSave }) {
   );
 }
 
-/* ── NoteWidget ── */
+// FIX #18: NoteWidget wrapper in expanded list view needs stopPropagation
+// so clicking inside the note section doesn't toggle the card closed.
 function NoteWidget({ vehicleId, note, onSave }) {
   const [open,setOpen]=useState(false); const [draft,setDraft]=useState(note??"");
   const save=()=>{ onSave(vehicleId,draft); setOpen(false); };
   if(!open) return (
-    <button type="button" className={`note-toggle ${note?"note-toggle--has":""}`} onClick={e=>{e.stopPropagation();setDraft(note??"");setOpen(true);}} title={note?`Notatka: ${note}`:"Dodaj notatkę"}>
+    <button type="button" className={`note-toggle ${note?"note-toggle--has":""}`}
+      onClick={e=>{e.stopPropagation();setDraft(note??"");setOpen(true);}}
+      title={note?`Notatka: ${note}`:"Dodaj notatkę"}>
       {note?"📝":"✎"}
     </button>
   );
+  // FIX #18: The editor div itself also stops propagation so any click inside
+  // (textarea, buttons) doesn't bubble up to the card header toggle.
   return (
     <div className="note-editor" onClick={e=>e.stopPropagation()}>
       <textarea className="note-textarea" value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Twoja notatka…" autoFocus rows={3} onKeyDown={e=>{if(e.key==="Enter"&&e.ctrlKey)save();if(e.key==="Escape")setOpen(false);}} />
@@ -159,7 +148,6 @@ function NoteWidget({ vehicleId, note, onSave }) {
   );
 }
 
-/* ── VehicleCard ── */
 function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats, verifyBusy, pendingDelete, selected, onToggleSelect, compareIds, inCompare, onToggleCompare, viewMode, note, onSaveNote, viewed, onMarkViewed }) {
   const [expanded,setExpanded]=useState(false); const [delConfirm,setDelConfirm]=useState(false);
   const s=row.snapshot_json||{}, url=row.listing_url||s.listingUrl||"", isOlx=url.includes("olx.pl");
@@ -173,7 +161,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
   const dealBadge=getDealBadge(row,stats);
   const isNew=s.__isNew===true, isArchived=s.__archived===true;
   const priceDiff=s.__priceDiff, priceHist=s.__priceHistory||[];
-  // Only show price-change UI when within TTL window
   const priceChanged = hasPriceChange(row);
   const effPlate=row.manual_license_plate??s.licensePlate??null;
   const effVin=row.manual_vin??s.vin??null;
@@ -190,7 +177,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
     </div>
   );
 
-  /* COMPACT */
   if (viewMode==="compact") return (
     <div className={["vdbc-compact",selected?"vdbc-compact--selected":"",pendingDelete?"vdbc--pending-delete":"",viewed?"vdbc-compact--viewed":"",isNew?"vdbc-compact--new":"",isArchived?"vdbc-compact--archived":"",priceChanged?"vdbc-compact--price-changed":""].filter(Boolean).join(" ")}>
       {checkboxEl}
@@ -202,17 +188,7 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
       <div className="vdbc-compact-info"><span className="vdbc-compact-title">{title}</span><span className="vdbc-compact-specs">{specParts.join(" · ")}</span></div>
       <div className="vdbc-compact-badges"><StatusBadge status={cepikStatus}/>{dealBadge&&<span className={`vdbc-deal ${dealBadge.cls}`}>{dealBadge.icon}</span>}<span className={`ft-portal-tag ${portalCls}`} style={{fontSize:8,padding:"1px 5px"}}>{portalLabel}</span></div>
       <div className="vdbc-compact-price">
-        {s.price&&(
-          <>
-            <span className="vdbc-compact-price-val">{fmt(s.price)}</span>
-            <span className="vdbc-compact-price-cur"> PLN</span>
-            {priceChanged&&priceDiff!=null&&(
-              <span className={`vdbc-diff ${priceDiff<0?"vdbc-diff--down":"vdbc-diff--up"}`} style={{fontSize:9,marginLeft:4}}>
-                {priceDiff<0?"▼":"▲"}{fmt(Math.abs(priceDiff))}
-              </span>
-            )}
-          </>
-        )}
+        {s.price&&(<><span className="vdbc-compact-price-val">{fmt(s.price)}</span><span className="vdbc-compact-price-cur"> PLN</span>{priceChanged&&priceDiff!=null&&(<span className={`vdbc-diff ${priceDiff<0?"vdbc-diff--down":"vdbc-diff--up"}`} style={{fontSize:9,marginLeft:4}}>{priceDiff<0?"▼":"▲"}{fmt(Math.abs(priceDiff))}</span>)}</>)}
       </div>
       <div className="vdbc-compact-actions" onClick={e=>e.stopPropagation()}>
         <NoteWidget vehicleId={row.id} note={note} onSave={onSaveNote}/>
@@ -223,7 +199,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
     </div>
   );
 
-  /* GRID */
   if (viewMode==="grid") return (
     <div className={["vdbc-grid-card",selected?"vdbc-grid-card--selected":"",pendingDelete?"vdbc--pending-delete":"",inCompare?"vdbc-grid-card--compare":"",viewed?"vdbc-grid-card--viewed":"",priceChanged?"vdbc-grid-card--price-changed":""].filter(Boolean).join(" ")}>
       <div className="vdbc-grid-img-wrap" onClick={handleOpen}>
@@ -254,7 +229,7 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
     </div>
   );
 
-  /* LIST (default) */
+  // LIST (default)
   return (
     <div className={["vdbc",expanded?"vdbc--open":"",isArchived?"vdbc--archived":"",isNew?"vdbc--new":"",pendingDelete?"vdbc--pending-delete":"",selected?"vdbc--selected":"",viewed?"vdbc--viewed":"",priceChanged?"vdbc--price-changed":""].filter(Boolean).join(" ")}>
       <div className="vdbc-hdr" onClick={()=>{setExpanded(v=>!v);onMarkViewed?.(row.id);}} role="button" tabIndex={0} onKeyDown={e=>e.key==="Enter"&&setExpanded(v=>!v)}>
@@ -264,7 +239,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
           {isNew&&<span className="vdbc-flag vdbc-flag--new">NOWY</span>}
           {isArchived&&<span className="vdbc-flag vdbc-flag--arch">ARCH.</span>}
           {pendingDelete&&<span className="vdbc-flag vdbc-flag--deleting">USUWA…</span>}
-          {/* Price-change badge overlaid on thumbnail so it's visible without expanding */}
           {priceChanged&&<PriceChangeBadge priceDiff={priceDiff} compact />}
         </div>
         <div className="vdbc-info">
@@ -275,7 +249,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
           <div className="vdbc-pills">
             <StatusBadge status={cepikStatus}/>
             {dealBadge&&<span className={`vdbc-deal ${dealBadge.cls}`}>{dealBadge.icon} {dealBadge.label}</span>}
-            {/* Inline price-change pill in the info area for list view */}
             {priceChanged&&<PriceChangeBadge priceDiff={priceDiff} />}
             <span className={`ft-portal-tag ${portalCls}`}>{portalLabel}</span>
           </div>
@@ -284,7 +257,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
           {s.price!=null&&(
             <div className="vdbc-price-block">
               <div className="vdbc-price">{fmt(s.price)}<span className="vdbc-cur"> {s.currency||"PLN"}</span></div>
-              {/* Show diff only when still within TTL */}
               {priceChanged&&priceDiff!=null&&(
                 <div className={`vdbc-diff ${priceDiff<0?"vdbc-diff--down":"vdbc-diff--up"}`}>
                   {priceDiff<0?"▼":"▲"} {fmt(Math.abs(priceDiff))} PLN
@@ -305,58 +277,37 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
 
       {expanded&&(
         <div className="vdbc-body">
-          {s.images?.length>1&&<div className="vdbc-imgstrip">{s.images.slice(0,8).map((u,i)=><img key={i} src={u} alt="" className="vdbc-strip-img" loading="lazy"/>)}</div>}
-          {(() => {
+          {s.images?.length>1&&<div className="vdbc-imgstrip">{s.images.slice(0,8).map((u,i)=><img key={i} src={u} alt="" className="vdbc-strip-img" loading="eager"/>)}</div>}
+          {(()=>{
             const specItems=[{lbl:"Rok",val:s.year},{lbl:"Przebieg",val:s.mileage?`${fmt(s.mileage)} km`:null},{lbl:"Moc",val:s.enginePower?`${s.enginePower} KM`:null},{lbl:"Pojemność",val:s.engineDisplacement?`${fmt(s.engineDisplacement)} cm³`:null},{lbl:"Paliwo",val:s.fuelType},{lbl:"Skrzynia",val:s.transmission},{lbl:"Napęd",val:s.drivetrain},{lbl:"Nadwozie",val:s.bodyType},{lbl:"Kraj",val:s.countryOfOrigin},{lbl:"Generacja",val:s.generation}].filter(x=>x.val!=null&&x.val!=="");
             return specItems.length>0&&<div className="vdbc-specs">{specItems.map(({lbl,val})=><div key={lbl} className="vdbc-spec"><div className="vdbc-spec-lbl">{lbl}</div><div className="vdbc-spec-val">{val}</div></div>)}</div>;
           })()}
-          {/* ── Price history section ───────────────────────────── */}
           {priceHist.length > 0 && (
             <div className="vdbc-section">
               <div className="vdbc-section-hdr">
                 Historia ceny
                 {priceChanged && priceDiff != null && (
-                  <span
-                    className={`vdbc-price-change-inline ${priceDiff < 0 ? "vdbc-price-change-inline--drop" : "vdbc-price-change-inline--rise"}`}
-                  >
+                  <span className={`vdbc-price-change-inline ${priceDiff < 0 ? "vdbc-price-change-inline--drop" : "vdbc-price-change-inline--rise"}`}>
                     {priceDiff < 0 ? "▼" : "▲"} {fmt(Math.abs(priceDiff))} PLN przy ostatnim skanie
                   </span>
                 )}
               </div>
               <div className="vdbc-price-chain">
                 {[...priceHist, { price: s.price, recordedAt: null }].map((ph, i, arr) => (
-                  <div
-                    key={i}
-                    className={`vdbc-chain-item ${i === arr.length - 1 ? "vdbc-chain-item--now" : ""}`}
-                  >
+                  <div key={i} className={`vdbc-chain-item ${i === arr.length - 1 ? "vdbc-chain-item--now" : ""}`}>
                     <span className="vdbc-chain-price">{fmt(ph.price)} PLN</span>
-                    <span className="vdbc-chain-date">
-                      {ph.recordedAt
-                        ? new Date(ph.recordedAt).toLocaleDateString("pl-PL")
-                        : "teraz"}
-                    </span>
-                    {/* Arrow between adjacent entries */}
+                    <span className="vdbc-chain-date">{ph.recordedAt ? new Date(ph.recordedAt).toLocaleDateString("pl-PL") : "teraz"}</span>
                     {i < arr.length - 1 && (() => {
                       const next = arr[i + 1].price;
                       if (next == null || ph.price == null) return null;
                       const diff = next - ph.price;
                       if (Math.abs(diff) < 100) return null;
-                      return (
-                        <span
-                          className={`vdbc-chain-arrow ${diff < 0 ? "vdbc-chain-arrow--drop" : "vdbc-chain-arrow--rise"}`}
-                          title={`${diff < 0 ? "Spadek" : "Wzrost"} o ${fmt(Math.abs(diff))} PLN`}
-                        >
-                          {diff < 0 ? "▼" : "▲"}
-                        </span>
-                      );
+                      return <span className={`vdbc-chain-arrow ${diff < 0 ? "vdbc-chain-arrow--drop" : "vdbc-chain-arrow--rise"}`} title={`${diff < 0 ? "Spadek" : "Wzrost"} o ${fmt(Math.abs(diff))} PLN`}>{diff < 0 ? "▼" : "▲"}</span>;
                     })()}
                   </div>
                 ))}
               </div>
-              {/* Sparkline for a quick visual overview */}
-              <div style={{ marginTop: 8 }}>
-                <PriceSparkline priceHistory={priceHist} currentPrice={s.price} />
-              </div>
+              <div style={{ marginTop: 8 }}><PriceSparkline priceHistory={priceHist} currentPrice={s.price} /></div>
             </div>
           )}
           <div className="vdbc-section vdbc-cepik-section">
@@ -372,7 +323,9 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
             </div>
             {row.verification&&<div className="vdbc-ver-summary"><span className="vdbc-ver-ok">✓ {row.verification.ok_count} zgodnych</span>{row.verification.warning_count>0&&<span className="vdbc-ver-warn">⚠ {row.verification.warning_count} rozbieżności</span>}{row.verification.created_at&&<span className="vdbc-ver-date">{new Date(row.verification.created_at).toLocaleDateString("pl-PL")}</span>}</div>}
           </div>
-          <div className="vdbc-section" style={{background:"var(--card)"}}>
+          {/* FIX #18: stopPropagation on the note section wrapper prevents
+              clicking it from toggling the card closed in list view */}
+          <div className="vdbc-section" style={{background:"var(--card)"}} onClick={e=>e.stopPropagation()}>
             <div className="vdbc-section-hdr">Notatka</div>
             <NoteWidget vehicleId={row.id} note={note} onSave={onSaveNote}/>
           </div>
@@ -384,7 +337,6 @@ function VehicleCard({ row, dups=[], onOpen, onDelete, onPatch, onVerify, stats,
   );
 }
 
-/* ── GroupStats ── */
 function GroupStats({ stats, filter }) {
   if (!stats||stats.count===0) return null;
   const metrics=[{lbl:"Śr. cena",val:stats.avgPrice?`${fmt(stats.avgPrice)} PLN`:null},{lbl:"Mediana",val:stats.medPrice?`${fmt(stats.medPrice)} PLN`:null},{lbl:"Śr. przebieg",val:stats.avgMileage?`${fmt(stats.avgMileage)} km`:null},{lbl:"Szt.",val:String(stats.count)}].filter(m=>m.val);
@@ -397,7 +349,6 @@ function GroupStats({ stats, filter }) {
   );
 }
 
-/* ── ViewModeToggle ── */
 function ViewModeToggle({ mode, onChange }) {
   return (
     <div className="vdb-view-toggle" role="group" aria-label="Tryb widoku">
@@ -408,7 +359,7 @@ function ViewModeToggle({ mode, onChange }) {
   );
 }
 
-/* ── FilterGroup ── */
+// FIX #4: Accept isJobRunning as prop (was hardcoded false in FilterGroup call).
 function FilterGroup({ groupKey, items, filter, collapsed, onToggle, onOpen, onDelete, onPatch, onVerify, verifyBusy, pendingDeleteIds, selectedIds, onToggleSelect, compareIds, onToggleCompare, viewMode, sortKey, onSortChange, notes, onSaveNote, viewedIds, onMarkViewed, onRunScan, isJobRunning }) {
   const stats  = useMemo(()=>computeGroupStats(items),[items]);
   const sorted = useMemo(()=>sortRows(items,sortKey),[items,sortKey]);
@@ -442,11 +393,7 @@ function FilterGroup({ groupKey, items, filter, collapsed, onToggle, onOpen, onD
           {newCount>0&&<span className="vdb-gbadge vdb-gbadge--new">{newCount} nowych</span>}
           {archivedCount>0&&<span className="vdb-gbadge vdb-gbadge--arch">{archivedCount} archiwum</span>}
           {issuesCount>0&&<span className="vdb-gbadge vdb-gbadge--issues">{issuesCount} uwag</span>}
-          {priceChangeCount>0&&(
-            <span className="vdb-gbadge vdb-gbadge--price" title="Zmiana ceny wykryta podczas ostatniego skanu">
-              {priceChangeCount} zm. ceny
-            </span>
-          )}
+          {priceChangeCount>0&&<span className="vdb-gbadge vdb-gbadge--price" title="Zmiana ceny wykryta podczas ostatniego skanu">{priceChangeCount} zm. ceny</span>}
         </div>
         {!collapsed&&(
           <select className="vdb-sort-select" value={sortKey||"newest"}
@@ -455,7 +402,8 @@ function FilterGroup({ groupKey, items, filter, collapsed, onToggle, onOpen, onD
           </select>
         )}
         {filter&&!collapsed&&(
-          <button type="button" className="vdb-group-scan-btn" onClick={e=>{e.stopPropagation();onRunScan?.(filter);}} disabled={isJobRunning} title={`Skanuj „${filter.name}"`}>▶</button>
+          <button type="button" className="vdb-group-scan-btn" onClick={e=>{e.stopPropagation();onRunScan?.(filter);}}
+            disabled={isJobRunning} title={`Skanuj „${filter.name}"`}>▶</button>
         )}
         {collapsed&&stats.avgPrice&&<div className="vdb-group-collapsed-meta">śr. {fmt(stats.avgPrice)} PLN · {fmt(stats.avgMileage)} km</div>}
       </div>
@@ -482,9 +430,12 @@ function FilterGroup({ groupKey, items, filter, collapsed, onToggle, onOpen, onD
 }
 
 /* ══════════════ MAIN EXPORT ══════════════ */
-export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFilter }) {
+// FIX #4: Accept isJobRunning prop.
+// FIX #6: Accept refreshRef to expose loadVehicles without remounting.
+export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFilter, isJobRunning = false, refreshRef }) {
   const [vehicles,setVehicles]=useState([]);
   const [loading,setLoading]=useState(false);
+  const [refreshing,setRefreshing]=useState(false); // FIX #11
   const [filterStatus,setFilterStatus]=useState("all");
   const [searchQuery,setSearchQuery]=useState("");
   const [verifyBusy,setVerifyBusy]=useState({});
@@ -494,13 +445,41 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
   const [collapsedGroups,setCollapsedGroups]=useState(loadCollapsedState);
   const [undoStack,setUndoStack]=useState([]);
   const pendingTimersRef=useRef({});
-  const pendingDeleteIds=useMemo(()=>new Set(undoStack.map(u=>u.id)),[undoStack]);
+  const vehiclesLenRef=useRef(0); // FIX #11: track current count without stale closure
 
   const {viewMode,setViewMode,sortByGroup,setSortForGroup,notes,setNote,viewedIds,markViewed,clearViewed}=useVehicleDbPrefs();
   const {exportCsv,exportJson}=useExport();
 
-  const loadVehicles=useCallback(async()=>{ if(!me)return; setLoading(true); try{const r=await apiFetch("/searches");if(r.ok)setVehicles(await r.json());}finally{setLoading(false);} },[me]);
+  // FIX #11: Show a subtle "refreshing" banner (not full spinner) when we
+  // already have data.  vdb-loading full spinner only shows on the first load.
+  const loadVehicles=useCallback(async()=>{
+    if(!me)return;
+    if(vehiclesLenRef.current > 0){
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    try{
+      const r=await apiFetch("/searches");
+      if(r.ok){
+        const rows = await r.json();
+        setVehicles(rows);
+        vehiclesLenRef.current = rows.length;
+      }
+    }finally{
+      setLoading(false);
+      setRefreshing(false);
+    }
+  },[me]);
+
   useEffect(()=>{loadVehicles();},[loadVehicles]);
+
+  // FIX #6: Expose loadVehicles to parent via ref (no more key={dbRefreshKey}).
+  useEffect(()=>{
+    if(refreshRef) refreshRef.current = loadVehicles;
+    return ()=>{ if(refreshRef) refreshRef.current = null; };
+  },[refreshRef, loadVehicles]);
+
   useEffect(()=>()=>{Object.values(pendingTimersRef.current).forEach(clearTimeout);},[]);
 
   const handleToggleSelect=useCallback(id=>{setSelectedIds(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});},[]);
@@ -535,12 +514,14 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
   },[]);
 
   const filtered=useMemo(()=>{
-    let l=vehicles.filter(v=>!pendingDeleteIds.has(v.id));
+    let l=vehicles.filter(v=>!new Set(undoStack.map(u=>u.id)).has(v.id));
     if(searchQuery.trim()){const q=searchQuery.toLowerCase();l=l.filter(v=>{const s=v.snapshot_json||{};return[s.brand,s.model,s.year,s.__filterName].filter(Boolean).join(" ").toLowerCase().includes(q);});}
     if(filterStatus==="price_changed") l=l.filter(v=>hasPriceChange(v));
     else if(filterStatus!=="all") l=l.filter(v=>getCepikStatus(v)===filterStatus);
     return l;
-  },[vehicles,filterStatus,searchQuery,pendingDeleteIds]);
+  },[vehicles,filterStatus,searchQuery,undoStack]);
+
+  const pendingDeleteIds=useMemo(()=>new Set(undoStack.map(u=>u.id)),[undoStack]);
 
   const handleSelectAll=useCallback(()=>setSelectedIds(new Set(filtered.map(v=>v.id))),[filtered]);
   const handleClearSelection=useCallback(()=>setSelectedIds(new Set()),[]);
@@ -550,39 +531,45 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
   const handleBatchDelete=useCallback(()=>{[...selectedIds].forEach(id=>handleDelete(id));setSelectedIds(new Set());},[selectedIds,handleDelete]);
   const handleBatchVerify=useCallback(async()=>{if(!verifiableSelectedIds.length)return;setBatchVerifyBusy(true);for(const id of verifiableSelectedIds){const row=vehicles.find(v=>v.id===id);if(row)await handleVerify(row);await new Promise(r=>setTimeout(r,800));}setBatchVerifyBusy(false);setSelectedIds(new Set());},[verifiableSelectedIds,vehicles,handleVerify]);
 
-  const grouped=useMemo(()=>{
-    const g={};
-    for(const v of filtered){
-      const src=v.snapshot_json?.__source;
-      if(src==="manual"){
-        if(!g["__manual"]) g["__manual"]=[];
-        g["__manual"].push(v);
+  // FIX #19: O(n) single-pass grouping instead of O(n×filters).
+  // Old code iterated all vehicles for every filter group membership check.
+  // New code builds all groups in one pass over the filtered list.
+  const grouped = useMemo(() => {
+    const g = new Map();
+    const ensure = key => { if (!g.has(key)) g.set(key, []); };
+
+    for (const v of filtered) {
+      const src = v.snapshot_json?.__source;
+      if (src === "manual") {
+        ensure("__manual");
+        g.get("__manual").push(v);
       } else {
-        // Get all filter names this vehicle appears in
-        const filterNames = v.snapshot_json?.__filterNames || [v.snapshot_json?.__filterName].filter(Boolean);
-        if(filterNames.length > 0){
-          // Add vehicle to each filter group it appears in
-          for(const filterName of filterNames){
-            if(!g[filterName]) g[filterName]=[];
-            g[filterName].push(v);
+        const filterNames = v.snapshot_json?.__filterNames ||
+          [v.snapshot_json?.__filterName].filter(Boolean);
+        if (filterNames.length > 0) {
+          for (const name of filterNames) {
+            ensure(name);
+            g.get(name).push(v);
           }
         } else {
-          // Vehicle without filter assignment
-          if(!g["__none"]) g["__none"]=[];
-          g["__none"].push(v);
+          ensure("__none");
+          g.get("__none").push(v);
         }
       }
     }
-    return Object.entries(g).sort(([a],[b])=>{if(a==="__manual")return 1;if(b==="__manual")return-1;if(a==="__none")return 1;if(b==="__none")return-1;return a.localeCompare(b,"pl");});
-  },[filtered]);
+
+    return [...g.entries()].sort(([a], [b]) => {
+      if (a === "__manual") return 1;
+      if (b === "__manual") return -1;
+      if (a === "__none")   return 1;
+      if (b === "__none")   return -1;
+      return a.localeCompare(b, "pl");
+    });
+  }, [filtered]);
 
   const counts=useMemo(()=>{
     const c={ok:0,issues:0,check:0,no_data:0,pending:0,price_changed:0};
-    for(const v of vehicles){
-      const s=getCepikStatus(v);
-      c[s]=(c[s]||0)+1;
-      if(hasPriceChange(v)) c.price_changed++;
-    }
+    for(const v of vehicles){const s=getCepikStatus(v);c[s]=(c[s]||0)+1;if(hasPriceChange(v))c.price_changed++;}
     return c;
   },[vehicles]);
 
@@ -596,7 +583,6 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
 
   return (
     <div className="vdb-tab">
-      {/* Header */}
       <div className="vdb-header">
         <div className="vdb-header-left">
           <div className="section-label">Baza pojazdów</div>
@@ -612,9 +598,20 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
           <ViewModeToggle mode={viewMode} onChange={setViewMode}/>
           {vehicles.length>0&&<><button type="button" className="vdb-export-btn" onClick={()=>exportCsv(vehicles)} title="Eksportuj CSV">⬇ CSV</button><button type="button" className="vdb-export-btn" onClick={()=>exportJson(vehicles)} title="Eksportuj JSON">⬇ JSON</button></>}
           {grouped.length>1&&<button type="button" className="vdb-refresh-btn" onClick={()=>{const all=grouped.every(([k])=>collapsedGroups[k]);const n={};grouped.forEach(([k])=>{n[k]=!all;});setCollapsedGroups(n);saveCollapsedState(n);}} title={grouped.every(([k])=>collapsedGroups[k])?"Rozwiń wszystkie":"Zwiń wszystkie"}>{grouped.every(([k])=>collapsedGroups[k])?"⊞":"⊟"}</button>}
-          <button type="button" className="vdb-refresh-btn" onClick={loadVehicles} disabled={loading} title="Odśwież"><span className={loading?"vdb-refresh-spin":""}>↻</span>{loading?"Ładuję…":"Odśwież"}</button>
+          <button type="button" className="vdb-refresh-btn" onClick={loadVehicles} disabled={loading||refreshing} title="Odśwież">
+            <span className={(loading||refreshing)?"vdb-refresh-spin":""}>↻</span>
+            {loading?"Ładuję…":refreshing?"Aktualizuję…":"Odśwież"}
+          </button>
         </div>
       </div>
+
+      {/* FIX #11: Subtle banner when refreshing existing data */}
+      {refreshing && (
+        <div className="vdb-refreshing-banner" aria-live="polite">
+          <div className="vdb-loading-spin" style={{ width: 14, height: 14, borderWidth: 2 }} />
+          Aktualizowanie danych…
+        </div>
+      )}
 
       {vehicles.length>0&&<DbStatsPanel vehicles={vehicles}/>}
 
@@ -627,7 +624,7 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
           </div>
           <div className="vdb-status-pills">
             {[
-              {key:"all",           label:"Wszystkie",    val:vehicles.length,        show:true},
+              {key:"all",           label:"Wszystkie",     val:vehicles.length,       show:true},
               {key:"price_changed", label:"↕ Zmiana ceny", val:counts.price_changed,  show:counts.price_changed>0},
               {key:"ok",            label:"✓ OK",          val:counts.ok,             show:counts.ok>0},
               {key:"issues",        label:"⚠ Uwagi",       val:counts.issues,         show:counts.issues>0},
@@ -649,7 +646,16 @@ export default function VehicleDatabaseTab({ me, onOpenItem, filters=[], onRunFi
         <div className="vdb-groups">
           {grouped.map(([groupKey,items])=>{
             const mf=filters.find(f=>f.name===groupKey);
-            return <FilterGroup key={groupKey} groupKey={groupKey} items={items} filter={mf} collapsed={!!collapsedGroups[groupKey]} onToggle={()=>toggleGroup(groupKey)} onOpen={onOpenItem} onDelete={handleDelete} onPatch={handlePatch} onVerify={handleVerify} verifyBusy={verifyBusy} pendingDeleteIds={pendingDeleteIds} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} compareIds={compareIds} onToggleCompare={handleToggleCompare} viewMode={viewMode} sortKey={sortByGroup[groupKey]||"newest"} onSortChange={setSortForGroup} notes={notes} onSaveNote={setNote} viewedIds={viewedIds} onMarkViewed={markViewed} onRunScan={onRunFilter} isJobRunning={false}/>;
+            // FIX #4: Pass real isJobRunning instead of hardcoded false.
+            return <FilterGroup key={groupKey} groupKey={groupKey} items={items} filter={mf}
+              collapsed={!!collapsedGroups[groupKey]} onToggle={()=>toggleGroup(groupKey)}
+              onOpen={onOpenItem} onDelete={handleDelete} onPatch={handlePatch} onVerify={handleVerify}
+              verifyBusy={verifyBusy} pendingDeleteIds={pendingDeleteIds}
+              selectedIds={selectedIds} onToggleSelect={handleToggleSelect}
+              compareIds={compareIds} onToggleCompare={handleToggleCompare}
+              viewMode={viewMode} sortKey={sortByGroup[groupKey]||"newest"} onSortChange={setSortForGroup}
+              notes={notes} onSaveNote={setNote} viewedIds={viewedIds} onMarkViewed={markViewed}
+              onRunScan={onRunFilter} isJobRunning={isJobRunning}/>;
           })}
         </div>
       )}
