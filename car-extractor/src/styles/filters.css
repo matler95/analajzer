@@ -1,0 +1,516 @@
+/* ════════════════════════════════════════════════════════════
+   FILTERS.CSS — Filters tab · Filter cards · Add/edit form ·
+                 Portal toggle · Brand/model rows · Templates
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Tab layout ─────────────────────────────────────────── */
+
+.filters-tab { display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
+
+.filters-tab-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.filters-tab-desc {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  line-height: 1.6;
+  margin-top: 4px;
+  max-width: 560px;
+}
+
+.filter-new-btn {
+  flex-shrink: 0;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  border-radius: 4px;
+  padding: 8px 18px;
+  font-family: var(--ff-m);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.filter-new-btn:hover { background: var(--amber); color: #000; }
+
+.filter-tpl-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: var(--ff-m);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.filter-tpl-btn:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-bg); }
+
+.filter-login-note {
+  background: #e0454510;
+  border: 1px solid #e0454540;
+  border-left: 3px solid var(--red);
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-family: var(--ff-m);
+  font-size: 11px;
+  color: #ffb0b0;
+}
+
+/* ── Filter card list ───────────────────────────────────── */
+
+.filter-list { display: flex; flex-direction: column; gap: 8px; }
+
+.filter-card {
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--card);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+
+.filter-card:hover        { border-color: var(--amber); }
+.filter-card--running     { border-color: var(--amber); border-left: 3px solid var(--amber); }
+
+.filter-card-body {
+  flex: 1;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filter-card-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+
+.filter-card-name {
+  font-family: var(--ff-d);
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ft-card-tags          { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.ft-multi-badge        { font-family: var(--ff-m); font-size: 9px; padding: 2px 8px; border-radius: 10px; background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); letter-spacing: .5px; flex-shrink: 0; }
+
+.filter-card-vehicle-label { font-family: var(--ff-m); font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filter-card-params        { font-family: var(--ff-m); font-size: 10px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.filter-card-meta       { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.filter-card-meta-item  { font-family: var(--ff-m); font-size: 10px; color: var(--sub); }
+.filter-card-meta-item strong { color: var(--text); }
+.filter-card-meta-never { color: var(--muted); font-style: italic; }
+
+.filter-card-actions {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+
+.filter-run-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 20px;
+  background: var(--amber-bg);
+  border: none;
+  border-bottom: 1px solid var(--border2);
+  color: var(--amber);
+  font-family: var(--ff-d);
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.filter-run-btn:hover:not(:disabled) { background: var(--amber); color: #000; }
+.filter-run-btn:disabled             { opacity: .4; cursor: not-allowed; }
+
+.filter-run-spinner { width: 12px; height: 12px; border: 2px solid #0005; border-top-color: var(--amber); border-radius: 50%; animation: spin .6s linear infinite; }
+
+.filter-edit-btn {
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border2);
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.filter-edit-btn:hover { color: var(--amber); background: var(--amber-bg); }
+
+.filter-del-btn {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border2);
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.filter-del-btn:hover          { color: var(--red); background: #e0454510; }
+.filter-del-btn--confirm       { color: var(--red); background: #e0454510; font-size: 10px; }
+
+/* ── Add / edit form ────────────────────────────────────── */
+
+.ft-add-form {
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+  padding: 22px 26px;
+  background: var(--card);
+  animation: fadeUp .2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ft-add-form--edit { border-color: var(--sub); border-left: 3px solid var(--amber); }
+.ft-add-form--edit .ft-add-title { color: var(--amber); }
+
+.ft-add-title { font-family: var(--ff-d); font-size: 22px; letter-spacing: 2px; color: var(--text); }
+
+.ft-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border2);
+  padding-bottom: 6px;
+  margin-top: 4px;
+}
+
+.ft-section-hint { font-size: 9px; color: var(--sub); letter-spacing: 0; text-transform: none; font-family: var(--ff-m); }
+
+/* Form fields */
+.ft-field         { display: flex; flex-direction: column; gap: 5px; }
+.ft-field--full   { grid-column: 1 / -1; }
+
+.ft-label {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  color: var(--sub);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.ft-input,
+.ft-select {
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--ff-m);
+  font-size: 12px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color .2s;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ft-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7a96'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.ft-input:focus,
+.ft-select:focus      { border-color: var(--amber); }
+.ft-select:disabled   { opacity: .4; cursor: not-allowed; }
+
+/* Brand/model rows */
+.ft-bm-list { display: flex; flex-direction: column; gap: 8px; }
+
+.ft-bm-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.ft-bm-remove {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+
+.ft-bm-remove:hover { border-color: var(--red); color: var(--red); background: #e0454510; }
+
+.ft-add-brand-btn {
+  background: transparent;
+  border: 1px dashed var(--border2);
+  color: var(--sub);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: var(--ff-m);
+  font-size: 10px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  transition: all .15s;
+  align-self: flex-start;
+}
+
+.ft-add-brand-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* Parameters grid */
+.ft-params-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+.ft-range-group  { display: flex; flex-direction: column; gap: 5px; }
+.ft-range-label  { font-family: var(--ff-m); font-size: 9px; color: var(--sub); letter-spacing: 1.5px; text-transform: uppercase; }
+.ft-range-unit   { text-transform: none; letter-spacing: 0; color: var(--muted); }
+.ft-range-inputs { display: flex; align-items: center; gap: 6px; }
+.ft-range-inputs .ft-input { flex: 1; min-width: 0; }
+.ft-range-sep    { font-family: var(--ff-m); font-size: 12px; color: var(--muted); flex-shrink: 0; }
+
+/* URL preview */
+.ft-preview { background: var(--card2); border: 1px solid var(--border2); border-radius: 4px; padding: 12px 14px; }
+.ft-preview-title { font-family: var(--ff-m); font-size: 9px; color: var(--sub); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+.ft-preview-url   { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px; }
+.ft-preview-link  { font-family: var(--ff-m); font-size: 9px; color: var(--sub); word-break: break-all; line-height: 1.5; }
+.ft-preview-link:hover { color: var(--amber); }
+
+.ft-preview-portal-badge {
+  flex-shrink: 0;
+  font-family: var(--ff-m);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  padding: 2px 5px;
+  border-radius: 2px;
+  align-self: flex-start;
+  margin-top: 1px;
+}
+
+.ft-preview-portal-badge--otomoto { background: rgba(255,107,53,.15); color: #ff6b35; border: 1px solid rgba(255,107,53,.3); }
+.ft-preview-portal-badge--olx     { background: rgba(0,177,64,.12);   color: #00d44a; border: 1px solid rgba(0,177,64,.3); }
+
+.ft-err { font-family: var(--ff-m); font-size: 11px; color: var(--red); padding: 8px 10px; border: 1px solid #e0454540; border-radius: 4px; background: #e0454510; }
+
+.ft-add-footer  { display: flex; align-items: center; gap: 10px; }
+
+.ft-submit-btn {
+  background: var(--amber);
+  border: none;
+  color: #000;
+  border-radius: 4px;
+  padding: 10px 24px;
+  font-family: var(--ff-d);
+  font-size: 15px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.ft-submit-btn:hover { background: #ffc22a; }
+
+.ft-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--sub);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-family: var(--ff-m);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.ft-cancel-btn:hover { border-color: var(--text); color: var(--text); }
+
+/* ── Portal toggle ──────────────────────────────────────── */
+
+.ft-portal-wrap  { display: flex; flex-direction: column; gap: 8px; }
+.ft-portal-group { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.ft-portal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--card2);
+  color: var(--sub);
+  font-family: var(--ff-m);
+  font-size: 11px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.ft-portal-btn:hover           { border-color: var(--amber); color: var(--text); }
+.ft-portal-btn--active         { border-color: var(--amber); background: var(--amber-bg); color: var(--amber); }
+
+.ft-portal-dot         { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ft-portal-dot--otomoto { background: #ff6b35; }
+.ft-portal-dot--olx    { background: #00b140; }
+
+.ft-portal-note {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--sub);
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--muted);
+  line-height: 1.6;
+}
+
+.ft-portal-note--info { border-left-color: var(--amber); }
+
+/* ── Portal tags (used on filter cards and vehicle cards) ── */
+
+.ft-portal-tag {
+  font-family: var(--ff-m);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.ft-portal-tag--otomoto { background: rgba(255,107,53,.12); color: #ff8855; border: 1px solid rgba(255,107,53,.3); }
+.ft-portal-tag--olx     { background: rgba(0,177,64,.10);   color: #00d44a; border: 1px solid rgba(0,177,64,.25); }
+.ft-portal-tag--both    { background: rgba(240,165,0,.12);  color: var(--amber); border: 1px solid rgba(240,165,0,.3); }
+
+/* ── Filter templates gallery ───────────────────────────── */
+
+.ft-templates {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  padding: 16px 18px 18px;
+  animation: fadeUp .2s ease;
+}
+
+.ft-tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+
+.ft-tpl-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s;
+  width: 100%;
+}
+
+.ft-tpl-card:hover:not(:disabled) { border-color: var(--amber); background: var(--card); }
+.ft-tpl-card--added               { opacity: .5; cursor: not-allowed; }
+
+.ft-tpl-emoji  { font-size: 20px; flex-shrink: 0; line-height: 1; width: 24px; text-align: center; }
+.ft-tpl-body   { flex: 1; min-width: 0; }
+.ft-tpl-label  { font-family: var(--ff-d); font-size: 17px; letter-spacing: .5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+.ft-tpl-desc   { font-family: var(--ff-m); font-size: 9px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ft-tpl-action { font-family: var(--ff-d); font-size: 16px; color: var(--amber); flex-shrink: 0; width: 20px; text-align: center; }
+.ft-tpl-card--added .ft-tpl-action { color: var(--green); font-size: 13px; }
+
+/* ── Filter empty state ─────────────────────────────────── */
+
+.filters-empty { text-align: center; padding: 60px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.filters-empty-ico   { font-size: 40px; opacity: .4; }
+.filters-empty-title { font-family: var(--ff-d); font-size: 24px; letter-spacing: 1px; color: var(--sub); }
+.filters-empty-desc  { font-family: var(--ff-m); font-size: 11px; color: var(--muted); max-width: 300px; line-height: 1.6; }
+
+/* ── Info box ───────────────────────────────────────────── */
+
+.filter-info-box {
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--amber);
+  border-radius: 4px;
+  padding: 16px 20px;
+  background: var(--card);
+}
+
+.filter-info-title {
+  font-family: var(--ff-m);
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.filter-info-list {
+  font-family: var(--ff-m);
+  font-size: 11px;
+  color: var(--sub);
+  line-height: 1.8;
+  padding-left: 18px;
+  margin: 0;
+}
+
+.filter-info-list li + li { margin-top: 2px; }
+
+/* ── Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 680px) {
+  .ft-params-grid { grid-template-columns: 1fr 1fr; }
+  .ft-bm-row      { grid-template-columns: 1fr 1fr; }
+  .ft-bm-remove   { grid-column: 1/-1; width: 100%; height: 28px; }
+  .ft-tpl-grid    { grid-template-columns: 1fr; }
+  .filter-card-actions { flex-direction: row; border-left: none; border-top: 1px solid var(--border2); }
+  .filter-run-btn { border-bottom: none; border-right: 1px solid var(--border2); }
+}
